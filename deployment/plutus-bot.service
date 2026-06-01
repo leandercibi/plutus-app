@@ -1,0 +1,18 @@
+# /etc/systemd/system/plutus-bot.service
+[Unit]
+Description=Plutus — Telegram Bot
+After=network.target plutus-main.service
+Requires=plutus-main.service
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/plutus-app/src
+Environment=PATH=/home/ubuntu/plutus-app/src/.venv/bin
+EnvironmentFile=/home/ubuntu/plutus-app/src/.env
+ExecStart=/home/ubuntu/plutus-app/src/.venv/bin/python bot.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

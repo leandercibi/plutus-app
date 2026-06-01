@@ -1,0 +1,6 @@
+tunnel: plutus
+credentials-file: /home/ubuntu/.cloudflared/<TUNNEL-UUID>.json
+ingress:
+  - hostname: plutus.your-domain.com
+    service: http://localhost:8501
+  - service: http_status:404

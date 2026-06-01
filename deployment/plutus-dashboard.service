@@ -1,0 +1,17 @@
+# /etc/systemd/system/plutus-dashboard.service
+[Unit]
+Description=Plutus — Streamlit Dashboard
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/plutus-app/src
+Environment=PATH=/home/ubuntu/plutus-app/src/.venv/bin
+EnvironmentFile=/home/ubuntu/plutus-app/src/.env
+ExecStart=/home/ubuntu/plutus-app/src/.venv/bin/streamlit run dashboard.py --server.port 8501 --server.address 0.0.0.0
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
