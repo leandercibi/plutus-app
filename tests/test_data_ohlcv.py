@@ -89,7 +89,7 @@ class TestFetchOhlcv:
     def test_empty_data_raises_error(self, mock_download):
         mock_download.return_value = pd.DataFrame()
         
-        with pytest.raises(ValueError, match="No data returned"):
+        with pytest.raises(ValueError, match="no data"):
             ohlcv.fetch_ohlcv("INVALID", days=90)
 
     @patch('plutus.data.ohlcv._read_cache')

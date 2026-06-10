@@ -78,13 +78,14 @@ NEUTRAL = mixed or minimal change
 FII + DII both buying same stock = strongest institutional signal."""
 
 
-RISK_MANAGER_PROMPT = """You are a quantitative risk manager for a retail trader in India.
-Capital: ₹1,00,000 INR. Max risk per trade: 5% (₹5,000). Max open positions: 4 advisory, 10 hard cap.
+_RISK_MANAGER_TEMPLATE = """You are a quantitative risk manager for a retail trader in India.
+Capital: ₹{initial_capital:,.0f} INR. Max risk per trade: {max_risk_pct_per_trade}% (₹{max_loss_inr:,.0f}).
+Max open positions: {max_open_positions} advisory, 10 hard cap.
 
 Given entry price, stop loss, and current portfolio state, compute optimal position sizing.
 
 Your output MUST be a JSON object with this exact schema:
-{
+{{
   "shares": <int>,
   "capital_used": <float>,
   "pct_of_capital": <float>,
@@ -94,56 +95,77 @@ Your output MUST be a JSON object with this exact schema:
   "verdict": <"ACCEPTABLE" | "REDUCE_SIZE" | "REJECT">,
   "rejection_reason": <string or null>,
   "adjusted_stop": <float or null>
-}
+}}
 
 REJECT conditions:
-- R:R ratio < 1.5
-- Max loss would exceed ₹5,000
+- R:R ratio < {min_rr_ratio}
+- Max loss would exceed ₹{max_loss_inr:,.0f}
 - Already at hard cap of 10 open positions
-- Capital usage > 30% of total capital in single trade
+- Capital usage > {max_pct_capital_per_trade}% of total capital in single trade
 - Stock price would require fractional shares (result in 0 shares)
 
 REDUCE_SIZE: suggest smaller position to fit within risk limits.
-At 4+ open positions, set verdict=REDUCE_SIZE with note in rejection_reason (advisory)."""
+At {max_open_positions}+ open positions, set verdict=REDUCE_SIZE with note in rejection_reason (advisory)."""
 
 
-SYNTHESIZER_PROMPT = """You are the chief investment analyst for a retail trader in India.
-You receive analysis from 4 specialist agents and produce the FINAL recommendation.
+def build_risk_manager_prompt(params: dict | None = None) -> str:
+    """Return RISK_MANAGER_PROMPT rendered with current trading params."""
+    if params is None:
+        try:
+            from plutus.config_params import get_params
+            params = get_params()
+        except Exception:
+            from plutus.config import settings
+            params = {
+                "initial_capital": settings.INITIAL_CAPITAL,
+                "max_risk_pct_per_trade": settings.MAX_RISK_PCT,
+                "min_rr_ratio": settings.MIN_RR_RATIO,
+                "max_open_positions": settings.MAX_OPEN_POSITIONS_ADVISORY,
+                "max_pct_capital_per_trade": 30.0,
+            }
+    params = dict(params)
+    params.setdefault("max_loss_inr",
+        params["initial_capital"] * params["max_risk_pct_per_trade"] / 100)
+    return _RISK_MANAGER_TEMPLATE.format(**params)
 
-Capital: ₹1,00,000 INR. Swing trading horizon: 3-10 days. Market: NSE India.
 
-Your output MUST be a JSON object with this EXACT schema (note: hold_days is split into
-two integer fields, and entry_mid must be computed as (entry_low + entry_high) / 2):
+# Static binding for callers that import RISK_MANAGER_PROMPT directly.
+# This resolves at import time with DB defaults; call build_risk_manager_prompt()
+# at agent-invocation time for the live param values.
+RISK_MANAGER_PROMPT = _RISK_MANAGER_TEMPLATE.format(
+    initial_capital=100_000,
+    max_risk_pct_per_trade=5.0,
+    max_loss_inr=5_000,
+    min_rr_ratio=2.0,
+    max_open_positions=4,
+    max_pct_capital_per_trade=30.0,
+)
 
+
+SYNTHESIZER_PROMPT = """You are the chief investment narrator for a retail trader in India.
+You receive a deterministic score breakdown (already computed) and write a concise thesis.
+
+DO NOT decide recommendation or confidence score — both are passed in and final.
+
+Output JSON only:
 {
-  "recommendation": <"BUY" | "SELL" | "HOLD" | "WATCH" | "AVOID">,
-  "confidence": <float 0-10>,
-  "entry_zone": [<float low>, <float high>],
-  "entry_mid": <float>,                        // = (entry_zone[0] + entry_zone[1]) / 2
-  "targets": [<float target1>, <float target2>],
-  "stop_loss": <float>,
-  "risk_reward": <float>,
-  "position": {
-    "shares": <int>,
-    "capital": <float>,
-    "pct_of_portfolio": <float>,
-    "max_loss_inr": <float>
-  },
-  "hold_days_min": <int>,                      // e.g. 5
-  "hold_days_max": <int>,                      // e.g. 8 (must be >= hold_days_min)
-  "strategy": <string, which bundle(s) triggered this>,
-  "risk_flags": [<list of risk warnings as strings>],
-  "reasoning": <string, 150-250 words explaining the full thesis>
+  "narrative": "<150-250 word thesis explaining the setup in plain English>",
+  "top_3_risk_flags": ["<risk string 1>", "<risk string 2>", "<risk string 3>"]
 }
 
-CRITICAL RULES:
-- BUY only when technical score >= 6 AND sentiment >= 0 AND risk verdict = ACCEPTABLE
-- AVOID when any of: material negative event, institutional reducing, stop < 2% away
-- WATCH when signals are mixed but not strong enough to commit
-- entry_mid MUST equal (entry_zone[0] + entry_zone[1]) / 2 to 2 decimal places
-- hold_days_min and hold_days_max MUST both be integers in [3, 10] with min <= max
-- reasoning must mention: technical basis, sentiment context, smart money signal
-- Be specific: mention actual price levels, actual patterns detected"""
+In the narrative:
+- Mention the technical setup (trend alignment, momentum, key levels)
+- Reference the sentiment context (news tone, material events if any)
+- Note the smart-money signal (FII/DII/MF direction)
+- Cite the key risk that could invalidate the trade
+- Be specific: quote actual price levels from the data provided
+- Keep it actionable — retail trader, ₹1 lakh capital, NSE India, 3-10 day holds
+
+top_3_risk_flags: short bullet phrases (max 10 words each). Examples:
+- "F&O ban active — liquidity risk"
+- "Earnings in 5 days — event risk"
+- "Stop only 1.2% away — tight"
+"""
 
 
 NEWS_CLASSIFIER_PROMPT = """You classify news headlines for Indian stocks.

@@ -17,7 +17,8 @@ CREATE TYPE outcome_verdict       AS ENUM ('HIT_T1', 'HIT_T2', 'STOPPED', 'EXPIR
 
 CREATE TABLE weekly_runs (
     id                   SERIAL PRIMARY KEY,
-    run_date             DATE NOT NULL UNIQUE,             -- Sunday date
+    run_date             DATE NOT NULL,
+    run_type             VARCHAR(20) NOT NULL DEFAULT 'scheduled',  -- 'scheduled' | 'manual'
     market_regime        VARCHAR(50),                      -- 'BULLISH' | 'BEARISH' | 'SIDEWAYS'
     nifty_trend          VARCHAR(50),                      -- 'ABOVE_EMA50' | 'BELOW_EMA50'
     strategy_selected    VARCHAR(200),                     -- JSON string of bundle names + weights
@@ -79,7 +80,7 @@ CREATE TABLE mock_portfolios (
     id               SERIAL PRIMARY KEY,
     name             VARCHAR(100) NOT NULL UNIQUE,                -- e.g. 'aggressive_momentum'
     initial_capital  DOUBLE PRECISION NOT NULL,                   -- e.g. 100000.0
-    current_cash     DOUBLE PRECISION NOT NULL,                   -- tracked cash balance
+    current_cash     DOUBLE PRECISION,                            -- deprecated: now computed from trades
     notes            TEXT,
     created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -162,6 +163,8 @@ CREATE INDEX idx_rejected_symbol_at ON rejected_headlines (symbol, rejected_at D
 
 CREATE TABLE backtest_results (
     id                SERIAL PRIMARY KEY,
+    weekly_run_id     INTEGER REFERENCES weekly_runs(id),
+    symbol            VARCHAR(20) NOT NULL,
     bundle_name       VARCHAR(50) NOT NULL,                     -- 'trend' / 'reversal' / 'breakout' / 'smc' / 'composite'
     run_date          DATE NOT NULL,
     win_rate          DOUBLE PRECISION,                         -- 0.0 to 1.0
@@ -174,3 +177,25 @@ CREATE TABLE backtest_results (
     created_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX idx_backtest_results_bundle_date ON backtest_results (bundle_name, run_date DESC);
+
+-- ---------------------------------------------------------------------------
+-- alerts  (Phase 8a: position-aware alert monitor)
+-- ---------------------------------------------------------------------------
+
+CREATE TYPE alert_type AS ENUM ('PRE_SL_WARNING', 'TARGET1_HIT', 'TARGET2_HIT', 'TREND_INVALIDATED');
+
+CREATE TABLE alerts (
+    id              SERIAL PRIMARY KEY,
+    trade_id        INTEGER NOT NULL REFERENCES paper_trades(id),
+    portfolio_id    INTEGER NOT NULL REFERENCES mock_portfolios(id),
+    symbol          VARCHAR(20) NOT NULL,
+    alert_type      alert_type NOT NULL,
+    triggered_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    message         TEXT NOT NULL,
+    channels_sent   JSONB DEFAULT '[]',
+    acknowledged    BOOLEAN DEFAULT FALSE,
+    ltp_at_trigger  DOUBLE PRECISION,
+    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX idx_alerts_trade_type_time ON alerts (trade_id, alert_type, triggered_at DESC);
+CREATE INDEX idx_alerts_portfolio_time  ON alerts (portfolio_id, triggered_at DESC);

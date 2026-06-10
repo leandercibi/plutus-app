@@ -26,8 +26,8 @@ FNO_BAN_TTL_HOURS = 24
 
 # ── Seed CSV ────────────────────────────────────────────────────────────────
 
-def _load_seed_symbols() -> List[str]:
-    path = Path(settings.UNIVERSE_SEED_CSV)
+def _load_seed_symbols(csv_path: str | None = None) -> List[str]:
+    path = Path(csv_path or settings.UNIVERSE_SEED_CSV)
     if not path.exists():
         raise FileNotFoundError(
             f"Seed universe CSV missing at {path}. "
@@ -111,14 +111,14 @@ def _save_cached_universe(symbols: List[str]) -> None:
 
 # ── Public API ──────────────────────────────────────────────────────────────
 
-def get_universe(use_cache: bool = True) -> List[str]:
+def get_universe(use_cache: bool = True, seed_csv: str | None = None) -> List[str]:
     """Return the filtered tradeable universe for the current ISO week."""
-    if use_cache:
+    if use_cache and seed_csv is None:
         cached = _load_cached_universe()
         if cached is not None:
             return cached
 
-    seed = _load_seed_symbols()
+    seed = _load_seed_symbols(seed_csv)
     banned = _load_fno_ban_list()
 
     kept: List[str] = []
@@ -164,3 +164,16 @@ def get_watchlist_symbols() -> List[str]:
 def get_full_analysis_set() -> List[str]:
     """Universe ∪ watchlist — watchlist symbols always pass through."""
     return list(dict.fromkeys(get_universe() + get_watchlist_symbols()))
+
+
+def get_symbol_sector(symbol: str) -> str | None:
+    """
+    Return sector for a symbol.
+    Order: Tickertape cache → SECTOR_FALLBACK → None.
+    Never blocks the weekly pipeline — returns None on any failure.
+    """
+    try:
+        from plutus.data.tickertape import get_sector as _tt_sector
+        return _tt_sector(symbol)
+    except Exception:
+        return None

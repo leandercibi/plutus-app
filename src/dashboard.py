@@ -50,6 +50,9 @@ tabs = st.tabs([
 
 # ── Helper Functions ──────────────────────────────────────────────────────
 
+from plutus.dashboard.helpers import drop_empty_revalidation as _drop_empty_revalidation
+
+
 def _get_latest_recs(db, run_id: int) -> List[Recommendation]:
     return (
         db.query(Recommendation)
@@ -64,29 +67,7 @@ def _get_portfolio_data(name: str) -> Dict[str, Any]:
     return PaperTrader(name).get_summary()
 
 
-def _get_trade_history(name: str) -> List[Dict[str, Any]]:
-    with SessionLocal() as db:
-        p = db.query(MockPortfolio).filter(MockPortfolio.name == name).first()
-        if not p:
-            return []
-        trades = (
-            db.query(PaperTrade)
-            .filter(PaperTrade.portfolio_id == p.id, PaperTrade.status == TradeStatus.CLOSED)
-            .order_by(PaperTrade.exit_date.asc())
-            .all()
-        )
-    return [{
-        "symbol": t.symbol,
-        "side": t.direction.value,
-        "entry_price": t.entry_price,
-        "entry_date": t.entry_date,
-        "exit_price": t.exit_price,
-        "exit_date": t.exit_date,
-        "shares": t.shares,
-        "realised_pnl": t.realised_pnl,
-        "realised_pnl_pct": t.realised_pnl_pct,
-        "exit_reason": t.exit_reason.value if t.exit_reason else None,
-    } for t in trades]
+from plutus.dashboard.portfolio_helpers import get_trade_history as _get_trade_history
 
 
 def _render_stock_chart(symbol: str, days: int = 60) -> None:
@@ -120,49 +101,16 @@ def _render_stock_chart(symbol: str, days: int = 60) -> None:
         st.caption(f"Chart unavailable for {symbol}.")
 
 
+from plutus.dashboard.analyze_card import (
+    render_analyze_card as _analyze_card,
+    render_analyze_result as _render_analyze_result_impl,
+)
+
+
 def _render_analyze_result(symbol: str, exchange: str = "NSE") -> None:
     """POST /analyze through the cached + rate-limited API."""
-    try:
-        with httpx.Client(timeout=30.0) as cli:
-            resp = cli.post(
-                f"{API_BASE}/analyze",
-                headers={"X-API-Key": API_KEY},
-                json={"symbol": symbol, "exchange": exchange},
-            )
-        if resp.status_code == 429:
-            data = resp.json()
-            st.warning(
-                f"Rate limit hit. Retry in {data.get('retry_after_seconds', '?')}s."
-            )
-            return
-        resp.raise_for_status()
-        data = resp.json()
-        cache_badge = "♻️ cache hit" if data.get("cache_hit") else "🆕 fresh"
-        st.caption(f"Source: **{cache_badge}** · "
-                   f"Rate limit remaining: {resp.headers.get('X-RateLimit-Remaining', '?')}")
-        st.json(data)
-    except Exception as e:
-        st.error(f"/analyze failed: {e}")
+    _render_analyze_result_impl(symbol, exchange, API_BASE, API_KEY)
 
-
-def _pretrade_check(portfolio: str, symbol: str, side: str, shares: int) -> str:
-    """Pre-trade risk check - inline implementation."""
-    from plutus.backtesting.paper_trader import PaperTrader
-    
-    trader = PaperTrader(portfolio)
-    summary = trader.get_summary()
-    
-    # Simple risk check
-    position_value = shares * 100  # Rough estimate
-    cash = summary['current_cash']
-    
-    if side.upper() == 'BUY' and position_value > cash:
-        return f"⚠️ Insufficient cash: ₹{cash:,.0f} available, ₹{position_value:,.0f} needed"
-    
-    if summary['open_count'] >= 10:
-        return f"⚠️ Too many open positions: {summary['open_count']}/10"
-    
-    return f"✓ Pre-trade check passed for {side} {shares} shares of {symbol}"
 
 
 def _suggest_keyword(headline: str) -> str:
@@ -302,11 +250,29 @@ with tabs[0]:
 
     with SessionLocal() as db:
         latest_run = (
-            db.query(WeeklyRun).order_by(WeeklyRun.run_date.desc()).first()
+            db.query(WeeklyRun).order_by(WeeklyRun.id.desc()).first()
         )
         if not latest_run:
             st.info("No weekly analysis yet. Next run: Sunday 18:00 IST.")
-        else:
+
+        if st.button("▶️ Run Weekly Analysis Now", type="primary"):
+            with st.spinner("Triggering pipeline…"):
+                try:
+                    with httpx.Client(timeout=10.0) as cli:
+                        r = cli.post(
+                            f"{API_BASE}/pipeline/run",
+                            headers={"X-API-Key": API_KEY},
+                        )
+                    if r.status_code == 409:
+                        st.warning("Pipeline is already running.")
+                    elif r.status_code in (200, 202):
+                        st.success("Pipeline started. Results will appear after completion.")
+                    else:
+                        st.error(f"Failed to start pipeline: {r.status_code} {r.text}")
+                except Exception as e:
+                    st.error(f"Could not reach API: {e}")
+
+        if latest_run:
             recs = _get_latest_recs(db, latest_run.id)
             buy = [r for r in recs if r.recommendation.value == "BUY"]
             watch = [r for r in recs if r.recommendation.value == "WATCH"]
@@ -342,11 +308,22 @@ with tabs[1]:
 
     with SessionLocal() as db:
         latest_run = (
-            db.query(WeeklyRun).order_by(WeeklyRun.run_date.desc()).first()
+            db.query(WeeklyRun).order_by(WeeklyRun.id.desc()).first()
         )
         if not latest_run:
             st.info("No data yet.")
         else:
+            # ── Top-of-page regime badges ────────────────────────────────
+            reg_color = {"BULLISH": "🟢", "BEARISH": "🔴", "SIDEWAYS": "🟡"}.get(
+                latest_run.market_regime or "", "⚪"
+            )
+            b1, b2, b3, b4 = st.columns(4)
+            b1.metric("Nifty Regime", f"{reg_color} {latest_run.market_regime or 'N/A'}")
+            b2.metric("Nifty Trend", latest_run.nifty_trend or "N/A")
+            b3.metric("BUY Signals", latest_run.total_buy_signals or 0)
+            b4.metric("WATCH Signals", latest_run.total_watch_signals or 0)
+            st.divider()
+
             recs = (
                 db.query(Recommendation)
                 .filter(Recommendation.weekly_run_id == latest_run.id)
@@ -356,16 +333,35 @@ with tabs[1]:
 
             rows: List[Dict[str, Any]] = []
             for r in recs:
+                # ── Derived distance columns ─────────────────────────
+                entry_mid = float(r.entry_mid) if r.entry_mid else None
+                sl = float(r.stop_loss) if r.stop_loss else None
+                t1 = float(r.target1) if r.target1 else None
+                t2 = float(r.target2) if r.target2 else None
+                sl_dist = (
+                    round((entry_mid - sl) / entry_mid * 100, 2)
+                    if entry_mid and sl and entry_mid > 0 else None
+                )
+                t1_dist = (
+                    round((t1 - entry_mid) / entry_mid * 100, 2)
+                    if entry_mid and t1 and entry_mid > 0 else None
+                )
+
                 rows.append({
                     "Symbol": r.symbol,
                     "Signal": r.recommendation.value,
-                    "Score": r.confidence,
-                    "Entry Low": r.entry_low,
-                    "Entry Mid": r.entry_mid,
-                    "Entry High": r.entry_high,
-                    "Target 1": r.target1,
-                    "Target 2": r.target2,
-                    "Stop Loss": r.stop_loss,
+                    "Score /10": r.confidence,
+                    "Tech": r.technical_score,
+                    "Sent": r.sentiment_score,
+                    "SmMny": r.smart_money_score,
+                    "Regime": r.regime_score,
+                    "R:R score": r.rr_score,
+                    "Entry Mid": entry_mid,
+                    "SL": sl,
+                    "SL dist%": sl_dist,
+                    "T1": t1,
+                    "T1 dist%": t1_dist,
+                    "T2": t2,
                     "R:R": r.rr_ratio,
                     "Hold (min)": r.hold_days_min,
                     "Hold (max)": r.hold_days_max,
@@ -380,19 +376,37 @@ with tabs[1]:
                 ["BUY", "WATCH", "HOLD", "AVOID"],
                 default=["BUY", "WATCH"],
             )
-            if signal_filter:
+            if signal_filter and not df.empty:
                 df = df[df["Signal"].isin(signal_filter)]
 
             # Hide the Revalidation column entirely if no row has one.
-            if not df["Revalidation"].any():
-                df = df.drop(columns=["Revalidation"])
+            df = _drop_empty_revalidation(df)
+
+            # ── Sub-score visibility toggle ──────────────────────────
+            show_sub = st.checkbox("Show sub-score pillars", value=False, key="sig_show_sub")
+            display_df = df.copy()
+            if not show_sub:
+                display_df = display_df.drop(
+                    columns=[c for c in ["Tech", "Sent", "SmMny", "Regime", "R:R score"] if c in display_df.columns],
+                    errors="ignore",
+                )
 
             st.dataframe(
-                df,
+                display_df,
                 use_container_width=True,
                 hide_index=True,
                 column_config={
-                    "Score": st.column_config.ProgressColumn(min_value=0, max_value=10),
+                    "Score /10": st.column_config.ProgressColumn(
+                        min_value=0, max_value=10, format="%.1f",
+                    ),
+                    "Tech":     st.column_config.NumberColumn(format="%.0f", width="small"),
+                    "Sent":     st.column_config.NumberColumn(format="%.0f", width="small"),
+                    "SmMny":    st.column_config.NumberColumn(format="%.0f", width="small"),
+                    "Regime":   st.column_config.NumberColumn(format="%.0f", width="small"),
+                    "R:R score": st.column_config.NumberColumn(format="%.0f", width="small"),
+                    "SL dist%": st.column_config.NumberColumn(format="%.2f%%"),
+                    "T1 dist%": st.column_config.NumberColumn(format="%.2f%%"),
+                    "R:R":      st.column_config.NumberColumn(format="%.2f×"),
                 },
             )
 
@@ -411,57 +425,218 @@ with tabs[2]:
     with SessionLocal() as db:
         portfolios = db.query(MockPortfolio).all()
 
+    # ── Create new portfolio ─────────────────────────────────────────────
+    with st.expander("+ Create New Portfolio", expanded=not portfolios):
+        np_col1, np_col2, np_col3 = st.columns([2, 2, 1])
+        new_name = np_col1.text_input("Portfolio Name", placeholder="e.g. swing_2026", key="new_port_name")
+        new_capital = np_col2.number_input("Initial Capital (₹)", min_value=10000, max_value=10_000_000,
+                                           value=100000, step=10000, key="new_port_capital")
+        if np_col3.button("Create", type="primary", key="new_port_btn"):
+            if new_name.strip():
+                from plutus.backtesting.paper_trader import PaperTrader
+                try:
+                    PaperTrader.create_portfolio(new_name.strip(), float(new_capital))
+                    st.success(f"Portfolio '{new_name.strip()}' created with ₹{new_capital:,.0f}")
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Failed: {exc}")
+            else:
+                st.warning("Enter a portfolio name.")
+
     if not portfolios:
-        st.info("No portfolios yet. Create one via Telegram: `/portfolio new myport 100000`.")
-    else:
-        names = [p.name for p in portfolios]
-        selected = st.selectbox("Portfolio", names)
-        summary = _get_portfolio_data(selected)
+        st.info("No portfolios yet. Create one above.")
+        st.stop()
 
-        c1, c2, c3, c4 = st.columns(4)
-        c1.metric("Initial Capital", f"₹{summary['initial_capital']:,.0f}")
-        c2.metric(
-            "Realised P&L",
-            f"₹{summary['realised_pnl']:,.0f}",
+    names = [p.name for p in portfolios]
+    selected = st.selectbox("Portfolio", names, key="port_select")
+    summary = _get_portfolio_data(selected)
+
+    # ── Top-level metrics ────────────────────────────────────────────────
+    m1, m2, m3, m4, m5, m6 = st.columns(6)
+    total_pnl = summary["realised_pnl"] + summary["unrealised_pnl"]
+    pnl_delta = f"₹{summary['unrealised_pnl']:+,.0f} unrealised"
+    m1.metric("Initial Capital", f"₹{summary['initial_capital']:,.0f}")
+    m2.metric("Current Value", f"₹{summary['current_value']:,.0f}")
+    m3.metric("Realised P&L", f"₹{summary['realised_pnl']:+,.0f}")
+    m4.metric("Unrealised P&L", f"₹{summary['unrealised_pnl']:+,.0f}")
+    m5.metric("Win Rate", f"{summary['win_rate']:.0f}%")
+    m6.metric("Open / Closed", f"{summary['open_count']} / {summary['closed_count']}")
+
+    # ── Expectancy stats ────────────────────────────────────────────────
+    hist = _get_trade_history(selected)
+    if hist:
+        df_hist = pd.DataFrame(hist)
+        winners = df_hist[df_hist["realised_pnl"] > 0]["realised_pnl_pct"]
+        losers  = df_hist[df_hist["realised_pnl"] <= 0]["realised_pnl_pct"]
+        avg_win  = winners.mean() if len(winners) else 0.0
+        avg_loss = losers.mean()  if len(losers)  else 0.0
+        win_rate_dec = summary["win_rate"] / 100
+        expectancy = (win_rate_dec * avg_win) + ((1 - win_rate_dec) * avg_loss)
+        ea, eb, ec = st.columns(3)
+        ea.metric("Avg Winner", f"{avg_win:.2f}%")
+        eb.metric("Avg Loser",  f"{avg_loss:.2f}%")
+        ec.metric("Expectancy", f"{expectancy:.2f}%")
+
+    st.divider()
+
+    # ── Open Positions ───────────────────────────────────────────────────
+    st.subheader("Open Positions")
+    from plutus.backtesting.paper_trader import PaperTrader
+    trader = PaperTrader(selected)
+    positions = trader.get_positions()
+    if positions:
+        pos_df = pd.DataFrame(positions)
+        pos_df["entry_date"] = pd.to_datetime(pos_df["entry_date"])
+        pos_df["days_held"] = (pd.Timestamp.now() - pos_df["entry_date"]).dt.days
+        display_cols = ["symbol", "shares", "entry_price", "current_price",
+                        "unrealised_pnl", "unrealised_pnl_pct", "capital_used",
+                        "days_held", "strategy_used"]
+        pos_df = pos_df[[c for c in display_cols if c in pos_df.columns]]
+        st.dataframe(
+            pos_df.rename(columns={
+                "symbol": "Symbol", "shares": "Shares",
+                "entry_price": "Entry ₹", "current_price": "LTP ₹",
+                "unrealised_pnl": "Unreal. P&L ₹", "unrealised_pnl_pct": "Unreal. %",
+                "capital_used": "Capital ₹", "days_held": "Days Held",
+                "strategy_used": "Strategy",
+            }),
+            use_container_width=True, hide_index=True,
+            column_config={
+                "Unreal. %": st.column_config.NumberColumn(format="%.2f%%"),
+            },
         )
-        c3.metric("Win Rate", f"{summary['win_rate']:.0f}%")
-        c4.metric("Open Positions", summary["open_count"])
+    else:
+        st.caption("No open positions.")
 
-        # Equity-curve overlay across all portfolios
-        st.subheader("Equity Curve Overlay")
-        fig = go.Figure()
-        for p in portfolios:
-            hist = _get_trade_history(p.name)
-            if not hist:
-                continue
-            d = pd.DataFrame(hist).sort_values("exit_date")
-            d["cum_pnl"] = d["realised_pnl"].cumsum()
-            fig.add_trace(go.Scatter(
-                x=d["exit_date"], y=d["cum_pnl"], mode="lines+markers", name=p.name,
-            ))
-        fig.add_hline(y=0, line_dash="dash", line_color="gray")
-        fig.update_layout(height=380, yaxis_title="Cumulative P&L (₹)")
-        st.plotly_chart(fig, use_container_width=True)
+    # ── Equity Curve (selected portfolio + overlay) ─────────────────────
+    st.subheader("Equity Curve")
+    ec_tabs = st.tabs(["This Portfolio", "All Portfolios Overlay"])
 
-        # Trade history table with filter
-        st.subheader("Trade History")
-        hist = _get_trade_history(selected)
+    with ec_tabs[0]:
         if hist:
-            d = pd.DataFrame(hist)
-            sym_filter = st.text_input("Filter by symbol (substring)", "")
-            if sym_filter:
-                d = d[d["symbol"].str.contains(sym_filter.upper())]
-            st.dataframe(d, use_container_width=True, hide_index=True)
+            df_ec = pd.DataFrame(hist).sort_values("exit_date")
+            df_ec["cum_pnl"] = df_ec["realised_pnl"].cumsum()
+            fig_ec = go.Figure()
+            fig_ec.add_trace(go.Scatter(
+                x=df_ec["exit_date"], y=df_ec["cum_pnl"],
+                mode="lines+markers", fill="tozeroy",
+                fillcolor="rgba(22,163,74,0.1)", line=dict(color="#16a34a"),
+                name="Cumulative P&L",
+            ))
+            fig_ec.add_hline(y=0, line_dash="dash", line_color="gray")
+            fig_ec.update_layout(height=350, yaxis_title="Cumulative P&L (₹)", showlegend=False)
+            st.plotly_chart(fig_ec, use_container_width=True)
+        else:
+            st.caption("No closed trades yet.")
 
-        # /buy /sell pre-trade check button
-        st.subheader("Pre-trade Check")
-        c5, c6, c7, c8 = st.columns([2, 1, 1, 1])
-        sym = c5.text_input("Symbol", "RELIANCE", key="ptc_sym")
-        side = c6.selectbox("Side", ["BUY", "SELL"], key="ptc_side")
-        shares = c7.number_input("Shares", min_value=1, value=10, step=1, key="ptc_qty")
-        if c8.button("Check"):
-            check = _pretrade_check(selected, sym, side, int(shares))
-            st.code(check, language="text")
+    with ec_tabs[1]:
+        fig_ov = go.Figure()
+        for p in portfolios:
+            h = _get_trade_history(p.name)
+            if not h:
+                continue
+            d = pd.DataFrame(h).sort_values("exit_date")
+            d["cum_pnl"] = d["realised_pnl"].cumsum()
+            fig_ov.add_trace(go.Scatter(
+                x=d["exit_date"], y=d["cum_pnl"],
+                mode="lines+markers", name=p.name,
+            ))
+        fig_ov.add_hline(y=0, line_dash="dash", line_color="gray")
+        fig_ov.update_layout(height=350, yaxis_title="Cumulative P&L (₹)")
+        st.plotly_chart(fig_ov, use_container_width=True)
+
+    # ── Trade History ────────────────────────────────────────────────────
+    st.subheader("Trade History")
+    if hist:
+        d = pd.DataFrame(hist)
+        sym_filter = st.text_input("Filter by symbol (substring)", "", key="port_sym_filter")
+        if sym_filter:
+            d = d[d["symbol"].str.contains(sym_filter.upper())]
+        d["pnl_color"] = d["realised_pnl"].apply(lambda x: "🟢" if x > 0 else "🔴")
+        d_display = d[["symbol", "side", "entry_price", "entry_date", "exit_price",
+                       "exit_date", "shares", "realised_pnl", "realised_pnl_pct",
+                       "exit_reason"]].copy()
+        d_display.columns = ["Symbol", "Side", "Entry ₹", "Entry Date", "Exit ₹",
+                              "Exit Date", "Shares", "P&L ₹", "P&L %", "Exit Reason"]
+        st.dataframe(
+            d_display, use_container_width=True, hide_index=True,
+            column_config={
+                "P&L %": st.column_config.NumberColumn(format="%.2f%%"),
+            },
+        )
+    else:
+        st.caption("No closed trades.")
+
+    # ── Trade Entry ──────────────────────────────────────────────────────
+    st.subheader("New Trade")
+    c5, c6, c7, c8, c9 = st.columns([2, 1, 1, 1, 1])
+    sym = c5.text_input("Symbol", "RELIANCE", key="ptc_sym")
+    side = c6.selectbox("Side", ["BUY", "SELL"], key="ptc_side")
+    shares_inp = c7.number_input("Shares", min_value=1, value=10, step=1, key="ptc_qty")
+    price = c8.number_input("Price (₹)", min_value=0.01, value=100.0, step=0.5, key="ptc_price")
+    if c9.button("Execute", type="primary"):
+        try:
+            if side == "BUY":
+                result = trader.buy(sym.upper(), float(price), int(shares_inp))
+                msg = f"✅ Bought {shares_inp} × {sym.upper()} @ ₹{price:.2f} (trade #{result.trade_id})"
+                if result.warnings:
+                    st.warning("\n".join(result.warnings))
+                st.success(msg)
+            else:
+                result = trader.sell(sym.upper(), float(price), int(shares_inp))
+                pnl = result["realised_pnl"]
+                st.success(f"✅ Sold {result['shares_closed']} × {sym.upper()} @ ₹{price:.2f} | P&L: ₹{pnl:+,.2f}")
+            st.rerun()
+        except ValueError as e:
+            st.error(f"⚠️ {e}")
+
+    # ── Admin: Reset portfolio ───────────────────────────────────────────
+    st.divider()
+    with st.expander("⚠️ Danger Zone", expanded=False):
+        st.warning("Resetting a portfolio deletes ALL trades and resets cash to initial capital.")
+        confirm_reset = st.checkbox("I understand — reset all trades for this portfolio", key="reset_confirm")
+        if st.button("Reset Portfolio", type="secondary", disabled=not confirm_reset, key="reset_btn"):
+            with SessionLocal() as db:
+                port_obj = db.query(MockPortfolio).filter(MockPortfolio.name == selected).first()
+                if port_obj:
+                    db.query(PaperTrade).filter(PaperTrade.portfolio_id == port_obj.id).delete()
+                    db.commit()
+            st.success(f"Portfolio '{selected}' has been reset.")
+            st.rerun()
+
+    # ── Alert history ────────────────────────────────────────────────────
+    st.divider()
+    st.subheader("Alert History (last 7 days)")
+    try:
+        from plutus.db.models import Alert as AlertModel
+        from datetime import timedelta
+        cutoff = datetime.utcnow() - timedelta(days=7)
+        with SessionLocal() as db:
+            port_obj = db.query(MockPortfolio).filter(MockPortfolio.name == selected).first()
+            if port_obj:
+                recent_alerts = (
+                    db.query(AlertModel)
+                    .filter(
+                        AlertModel.portfolio_id == port_obj.id,
+                        AlertModel.triggered_at >= cutoff,
+                    )
+                    .order_by(AlertModel.triggered_at.desc())
+                    .limit(50)
+                    .all()
+                )
+                if recent_alerts:
+                    st.caption(f"{len(recent_alerts)} alerts in the last 7 days")
+                    for a in recent_alerts:
+                        icon = {"PRE_SL_WARNING": "⚠️", "TARGET1_HIT": "🎯",
+                                "TARGET2_HIT": "🎯🎯", "TREND_INVALIDATED": "📉"}.get(
+                            a.alert_type.value if a.alert_type else "", "🔔")
+                        ts = a.triggered_at.strftime("%d %b %H:%M") if a.triggered_at else "?"
+                        st.caption(f"{icon} `{ts}` **{a.symbol}** — {a.alert_type.value} @ ₹{a.ltp_at_trigger or '?'}")
+                else:
+                    st.caption("No alerts in the last 7 days.")
+    except Exception:
+        st.caption("Alert history unavailable.")
+
 with tabs[3]:
     st.title("🧪 Strategy Lab")
 
@@ -492,7 +667,7 @@ with tabs[3]:
             "Max DD": f"{r.max_drawdown_pct:.2f}%",
             "Sharpe": round(r.sharpe_ratio, 3),
             "Trades": r.total_trades,
-            "Weight": f"{r.weight_assigned:.1%}",
+            "Weight": f"{r.weight_assigned:.1%}" if r.weight_assigned is not None else "—",
         } for r in dedup if r.bundle_name in BUNDLES])
         st.subheader("5-Bundle Comparison")
         st.dataframe(df, use_container_width=True, hide_index=True)
@@ -648,7 +823,7 @@ with tabs[6]:
 
     with SessionLocal() as db:
         runs = (
-            db.query(WeeklyRun).order_by(WeeklyRun.run_date.desc()).all()
+            db.query(WeeklyRun).order_by(WeeklyRun.id.desc()).all()
         )
     if not runs:
         st.info("No history yet.")
@@ -694,19 +869,121 @@ with tabs[6]:
 with tabs[7]:
     st.title("⚙️ Settings")
 
+    # ── Trading Parameters (editable) ────────────────────────────────────────
     st.subheader("Trading Parameters")
-    st.json({
-        "initial_capital": settings.INITIAL_CAPITAL,
-        "max_risk_pct": settings.MAX_RISK_PCT,
-        "min_rr_ratio": settings.MIN_RR_RATIO,
-        "max_open_positions_advisory": settings.MAX_OPEN_POSITIONS_ADVISORY,
-        "max_open_positions_hard": settings.MAX_OPEN_POSITIONS_HARD,
-        "hold_days_default": f"{settings.HOLD_DAYS_MIN}–{settings.HOLD_DAYS_MAX}",
-    })
+    try:
+        from plutus.config_params import get_param_meta, set_param, params_version_id
+        param_meta = get_param_meta()
 
-    st.subheader("Environment (redacted)")
-    st.json(_redacted_env_summary())
+        cols = st.columns(2)
+        inputs: dict = {}
 
+        def _num_input(key: str, col):
+            meta = param_meta.get(key, {})
+            label = meta.get("label", key)
+            current = meta.get("value", 0)
+            min_v = float(meta.get("min") or 0)
+            max_v = float(meta.get("max") or 1e9)
+            vtype = meta.get("value_type", "float")
+            if vtype == "int":
+                return col.number_input(label, value=int(current), min_value=int(min_v), max_value=int(max_v), step=1, key=f"tp_{key}")
+            return col.number_input(label, value=float(current), min_value=min_v, max_value=max_v, step=0.5, format="%.1f", key=f"tp_{key}")
+
+        inputs["initial_capital"]           = _num_input("initial_capital",           cols[0])
+        inputs["max_risk_pct_per_trade"]    = _num_input("max_risk_pct_per_trade",    cols[1])
+        inputs["min_rr_ratio"]              = _num_input("min_rr_ratio",              cols[0])
+        inputs["max_open_positions"]        = _num_input("max_open_positions",        cols[1])
+        inputs["hold_days_min"]             = _num_input("hold_days_min",             cols[0])
+        inputs["hold_days_max"]             = _num_input("hold_days_max",             cols[1])
+        inputs["max_pct_capital_per_trade"] = _num_input("max_pct_capital_per_trade", cols[0])
+
+        st.divider()
+        st.caption("Score thresholds (must satisfy: buy > watch > avoid)")
+        inputs["buy_threshold"]   = _num_input("buy_threshold",   cols[0])
+        inputs["watch_threshold"] = _num_input("watch_threshold", cols[1])
+        inputs["avoid_threshold"] = _num_input("avoid_threshold", cols[0])
+
+        save_btn = st.button("💾 Save Parameters", type="primary", key="save_params_btn")
+
+        if save_btn:
+            errors = []
+            if inputs["buy_threshold"] <= inputs["watch_threshold"]:
+                errors.append("BUY threshold must be > WATCH threshold")
+            if inputs["watch_threshold"] <= inputs["avoid_threshold"]:
+                errors.append("WATCH threshold must be > AVOID threshold")
+            if inputs["hold_days_min"] > inputs["hold_days_max"]:
+                errors.append("Hold days min must be ≤ max")
+            if errors:
+                for e in errors:
+                    st.error(e)
+            else:
+                try:
+                    for key, val in inputs.items():
+                        set_param(key, val, updated_by="dashboard")
+                    new_ver = params_version_id()
+                    st.success(f"Parameters saved. Params version: `{new_ver}`")
+                    st.info("Re-run the weekly pipeline to apply new parameters to recommendations.")
+                except Exception as exc:
+                    st.error(f"Save failed: {exc}")
+
+        # Show current params version
+        ver = params_version_id()
+        st.caption(f"Current params version: `{ver}`")
+
+    except Exception as exc:
+        st.warning(f"Could not load editable parameters: {exc}")
+        st.subheader("Trading Parameters (read-only fallback)")
+        st.json({
+            "initial_capital": settings.INITIAL_CAPITAL,
+            "max_risk_pct": settings.MAX_RISK_PCT,
+            "min_rr_ratio": settings.MIN_RR_RATIO,
+        })
+
+    # ── Tuning Suggestions ───────────────────────────────────────────────────
+    st.divider()
+    st.subheader("🔧 Tuning Suggestions")
+    try:
+        with SessionLocal() as db:
+            from plutus.db.models import TuningSuggestion
+            suggestions = (
+                db.query(TuningSuggestion)
+                .filter(TuningSuggestion.status == "pending")
+                .order_by(TuningSuggestion.report_date.desc())
+                .limit(20)
+                .all()
+            )
+        if not suggestions:
+            st.caption("No pending tuning suggestions.")
+        else:
+            for s in suggestions:
+                with st.expander(f"[{s.dimension}] {s.dimension_value} — {s.current_win_rate:.0%} win rate (n={s.n_trades})"):
+                    st.write(s.suggestion_text)
+                    c1, c2, c3 = st.columns(3)
+                    if c1.button("✅ Apply", key=f"sug_apply_{s.id}"):
+                        from plutus.weekly.tuner import apply_suggestion
+                        with SessionLocal() as db2:
+                            ok = apply_suggestion(s.id, db_session=db2)
+                        st.success("Applied." if ok else "Already applied.")
+                        st.rerun()
+                    if c2.button("❌ Reject", key=f"sug_reject_{s.id}"):
+                        with SessionLocal() as db2:
+                            row = db2.query(TuningSuggestion).get(s.id)
+                            if row:
+                                row.status = "rejected"
+                                db2.commit()
+                        st.rerun()
+                    if c3.button("⏸ Defer", key=f"sug_defer_{s.id}"):
+                        with SessionLocal() as db2:
+                            row = db2.query(TuningSuggestion).get(s.id)
+                            if row:
+                                row.status = "deferred"
+                                db2.commit()
+                        st.rerun()
+    except Exception as exc:
+        st.caption(f"Could not load suggestions: {exc}")
+
+    # ── Material-keyword Filter ──────────────────────────────────────────────
+    st.divider()
     st.subheader("Material-keyword Filter")
     st.write(f"**Enabled tiers:** `{settings.MATERIAL_KEYWORD_TIERS}`")
     st.caption(
@@ -721,7 +998,7 @@ with tabs[7]:
 
     st.subheader("Last Weekly Run")
     with SessionLocal() as db:
-        last = db.query(WeeklyRun).order_by(WeeklyRun.run_date.desc()).first()
+        last = db.query(WeeklyRun).order_by(WeeklyRun.id.desc()).first()
     if last:
         st.write(
             f"Run date **{last.run_date}** — completed at "

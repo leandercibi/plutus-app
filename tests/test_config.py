@@ -89,7 +89,7 @@ class TestConfigDefaults:
         
         assert settings.API_SECRET_KEY == "change_this_in_production"
         assert settings.API_HOST == "0.0.0.0"
-        assert settings.API_PORT == 8000
+        assert settings.API_PORT == 8009
         assert settings.API_RATE_LIMIT_PER_HOUR == 30
         assert settings.ANALYZE_CACHE_TTL_SECONDS == 300
     
@@ -142,7 +142,7 @@ class TestConfigDefaults:
         assert settings.WEEKLY_REVALIDATE_DAY == "mon"
         assert settings.WEEKLY_REVALIDATE_HOUR == 9
         assert settings.WEEKLY_REVALIDATE_MINUTE == 10
-        assert settings.NEWS_CHECK_INTERVAL_MINUTES == 60
+        assert settings.NEWS_CHECK_INTERVAL_MINUTES == 30
         assert settings.MARKET_OPEN_HOUR == 9
         assert settings.MARKET_CLOSE_HOUR == 16
         assert settings.REJECTED_HEADLINES_RETENTION_DAYS == 30

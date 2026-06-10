@@ -2,42 +2,64 @@
 from __future__ import annotations
 
 import json
+from dataclasses import asdict
 
-from plutus.agents.openrouter_client import call_llm
+from plutus.agents.openrouter_client import call_llm, _parse_llm_json
 from plutus.agents.prompts import SYNTHESIZER_PROMPT
+from plutus.agents.scoring import Classification, ScoreBreakdown
 from plutus.config import settings
 
 
 def run_synthesis(
     symbol: str,
-    current_price: float,
-    technical: dict,
-    sentiment: dict,
-    smart_money: dict,
-    risk: dict,
+    breakdown: ScoreBreakdown,
+    classification: Classification,
+    current_price: float = 0.0,
+    technical_output: dict | None = None,
+    sentiment_output: dict | None = None,
+    smart_money_output: dict | None = None,
+    risk_output: dict | None = None,
 ) -> dict:
     """
-    Call the synthesizer LLM (model env var DEEPSEEK_REASON_MODEL).
-    Currently resolves to V4 Flash; user can swap to a heavier reasoner via env.
+    Call the synthesizer LLM to write a narrative and risk flags.
+    The recommendation/confidence are NOT determined here — they come from scoring.py.
+    Returns: {"narrative": str, "top_3_risk_flags": list[str]}
     """
-    user_msg = f"""Stock: {symbol} | Current Price: ₹{current_price:.2f}
+    inputs = {
+        "symbol": symbol,
+        "current_price": current_price,
+        "recommendation": classification.value,
+        "composite_score": breakdown.composite,
+        "sub_scores": {
+            "technical":   breakdown.technical,
+            "smart_money": breakdown.smart_money,
+            "sentiment":   breakdown.sentiment,
+            "regime":      breakdown.regime,
+            "rr":          breakdown.rr,
+        },
+        "hard_avoid_reasons": list(breakdown.hard_avoid_reasons),
+        "technical_output":    technical_output or {},
+        "sentiment_output":    sentiment_output or {},
+        "smart_money_output":  smart_money_output or {},
+        "risk_output":         risk_output or {},
+    }
 
-TECHNICAL ANALYSIS:
-{json.dumps(technical, indent=2)}
+    user_msg = f"""Stock: {symbol} | Price: ₹{current_price:.2f}
+Composite Score: {breakdown.composite}/100 → {classification.value}
 
-SENTIMENT ANALYSIS:
-{json.dumps(sentiment, indent=2)}
+Sub-scores: {json.dumps(inputs['sub_scores'], indent=2)}
+Hard avoid reasons: {inputs['hard_avoid_reasons']}
 
-SMART MONEY SIGNALS:
-{json.dumps(smart_money, indent=2)}
+Technical context:
+{json.dumps(technical_output or {}, indent=2)}
 
-RISK ASSESSMENT:
-{json.dumps(risk, indent=2)}
+Sentiment context:
+{json.dumps(sentiment_output or {}, indent=2)}
 
-Produce the final investment recommendation. Remember:
-- Output JSON only, matching the schema in the system prompt.
-- entry_mid MUST equal (entry_zone[0] + entry_zone[1]) / 2.
-- hold_days_min and hold_days_max are integers (not a string)."""
+Smart money context:
+{json.dumps(smart_money_output or {}, indent=2)}
+
+Write the narrative and top_3_risk_flags. Output JSON only."""
 
     response = call_llm(
         messages=[
@@ -46,13 +68,11 @@ Produce the final investment recommendation. Remember:
         ],
         model=settings.DEEPSEEK_REASON_MODEL,
         response_format={"type": "json_object"},
-        temperature=0.2,
+        temperature=0.3,
     )
-    parsed = json.loads(response)
+    parsed = _parse_llm_json(response)
 
-    # Defensive: enforce entry_mid even if the LLM forgot.
-    ez = parsed.get("entry_zone")
-    if ez and len(ez) == 2 and parsed.get("entry_mid") is None:
-        parsed["entry_mid"] = round((float(ez[0]) + float(ez[1])) / 2, 2)
-
-    return parsed
+    return {
+        "narrative": parsed.get("narrative", ""),
+        "top_3_risk_flags": parsed.get("top_3_risk_flags", [])[:3],
+    }

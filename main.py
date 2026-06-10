@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 import httpx
@@ -18,6 +18,10 @@ from sqlalchemy import text
 from plutus.agents.graph import run_analysis
 from plutus.api.routes import router as api_router
 from plutus.backtesting.runner import run_all_bundles
+from plutus.data.regime import persist_regime_snapshot
+from plutus.pipeline.checkpoint import (
+    cleanup_old_runs, load_ohlcv, new_run_id, save_ohlcv, save_stage,
+)
 from plutus.config import settings
 from plutus.data.news import classify_news, fetch_news
 from plutus.data.ohlcv import fetch_live_price, fetch_ohlcv
@@ -31,7 +35,9 @@ from plutus.db.models import (
     WeeklyRun,
 )
 from plutus.db.session import SessionLocal
-# from plutus.weekly.outcomes import track_recommendation_outcomes  # see 14_weekly_history.md
+from plutus.alerts.monitor import run_monitor as run_alert_monitor
+from plutus.weekly.outcomes import track_recommendation_outcomes
+from plutus.weekly.tuner import run_full_self_finetuning
 
 logger = structlog.get_logger()
 IST = pytz.timezone("Asia/Kolkata")
@@ -78,7 +84,16 @@ async def weekly_pipeline() -> None:
     """
     started = datetime.now(IST)
     run_date = started.date()
-    logger.info("weekly_pipeline_start", date=str(run_date))
+    pipeline_run_id = new_run_id()
+    logger.info("weekly_pipeline_start", date=str(run_date), run_id=pipeline_run_id)
+
+    # 0. Regime snapshot (persisted once per weekly run, used by scoring)
+    with SessionLocal() as db:
+        try:
+            await asyncio.to_thread(persist_regime_snapshot, db)
+            logger.info("regime_snapshot_persisted", date=str(run_date))
+        except Exception as e:
+            logger.warning("regime_snapshot_failed", error=str(e))
 
     # 1. Universe
     symbols = await asyncio.to_thread(get_universe)
@@ -86,8 +101,12 @@ async def weekly_pipeline() -> None:
 
     # 2. All 5 bundles per symbol — Backtrader is sync, push to thread pool.
     def _score_symbol(sym: str) -> tuple[str, float, dict]:
-        bundle_results = run_all_bundles(sym, lookback_days=settings.BACKTEST_LOOKBACK_DAYS)
-        # bundle_results: Dict[str, BundleResult] with 5 keys
+        # Reuse same-day OHLCV if available
+        df = load_ohlcv(sym)
+        if df is None:
+            df = fetch_ohlcv(sym, days=settings.BACKTEST_LOOKBACK_DAYS)
+            save_ohlcv(sym, df)
+        bundle_results = run_all_bundles(sym, days=settings.BACKTEST_LOOKBACK_DAYS)
         best_name, best = max(
             bundle_results.items(),
             key=lambda kv: (kv[1].sharpe_ratio if kv[1] else -999),
@@ -101,6 +120,10 @@ async def weekly_pipeline() -> None:
         except Exception as e:
             logger.warning("bundle_scoring_failed", symbol=sym, error=str(e))
 
+    # Checkpoint scores
+    save_stage(pipeline_run_id, "scores", [(sym, sharpe) for sym, sharpe, _ in scored])
+    logger.info("scores_checkpoint_saved", run_id=pipeline_run_id, count=len(scored))
+
     # 3. Top 20 by best-bundle Sharpe
     scored.sort(key=lambda t: t[1], reverse=True)
     top20 = scored[: settings.BACKTEST_TOP_CANDIDATES]
@@ -110,13 +133,24 @@ async def weekly_pipeline() -> None:
     analyses: list[tuple[str, dict]] = []
     for sym, _sharpe, _bundles in top20:
         try:
-            result = await asyncio.to_thread(run_analysis, sym, "NSE", False)
-            #                                                  ^^^^^ use_cache=False
+            result = await asyncio.to_thread(run_analysis, sym, "NSE")
             analyses.append((sym, result))
         except Exception as e:
             logger.error("agent_pipeline_failed", symbol=sym, error=str(e))
 
+    # Checkpoint analyses
+    save_stage(pipeline_run_id, "analyses", {sym: res for sym, res in analyses})
+    logger.info("analyses_checkpoint_saved", run_id=pipeline_run_id, count=len(analyses))
+
     # 5. DB writes — one weekly_runs + one recommendations row per BUY/WATCH
+    # Fetch live regime for WeeklyRun metadata
+    try:
+        from plutus.data.regime import get_nifty_regime
+        _regime_meta = await asyncio.to_thread(get_nifty_regime)
+        _regime_trend = _regime_meta.get("trend", "UNKNOWN")
+    except Exception:
+        _regime_trend = "UNKNOWN"
+
     buy_list: list[str] = []
     watch_list: list[str] = []
     with SessionLocal() as db:
@@ -125,6 +159,8 @@ async def weekly_pipeline() -> None:
             stocks_screened=len(symbols),
             stocks_analysed=len(top20),
             generated_at=started,
+            market_regime=_regime_trend,
+            nifty_trend=_regime_trend,
         )
         db.add(wr)
         db.flush()
@@ -405,14 +441,16 @@ async def cleanup_rejected_headlines() -> None:
     Daily prune of rejected_headlines older than
     settings.REJECTED_HEADLINES_RETENTION_DAYS (default 30).
     """
+    from plutus.db.models import RejectedHeadline
+
     days = int(settings.REJECTED_HEADLINES_RETENTION_DAYS)
-    sql = text(
-        "DELETE FROM rejected_headlines "
-        "WHERE rejected_at < NOW() - (:days || ' days')::interval"
-    )
+    cutoff = datetime.utcnow() - timedelta(days=days)
     with SessionLocal() as db:
-        result = db.execute(sql, {"days": days})
-        deleted = result.rowcount or 0
+        deleted = (
+            db.query(RejectedHeadline)
+            .filter(RejectedHeadline.rejected_at < cutoff)
+            .delete(synchronize_session=False)
+        )
         db.commit()
     logger.info("rejected_headlines_cleaned", deleted=deleted, retention_days=days)
 
@@ -461,22 +499,57 @@ def build_scheduler() -> AsyncIOScheduler:
         max_instances=1,
     )
 
-    # 4. Outcome tracker — Mon-Fri 16:30 IST (TODO: Phase 7 - track_recommendation_outcomes not implemented yet)
-    # sched.add_job(
-    #     track_recommendation_outcomes,
-    #     CronTrigger(day_of_week="mon-fri", hour=16, minute=30, timezone=IST),
-    #     id="outcome_tracker",
-    #     name="Daily outcome tracker",
-    #     max_instances=1,
-    #     coalesce=True,
-    # )
+    # 4. Self-finetuning postmortem — Sun 17:00 IST (before weekly pipeline at 18:00)
+    sched.add_job(
+        lambda: run_full_self_finetuning(lookback_days=30),
+        CronTrigger(day_of_week="sun", hour=17, minute=0, timezone=IST),
+        id="self_finetuning",
+        name="Weekly self-finetuning postmortem (Sun 17:00 IST)",
+        max_instances=1,
+        coalesce=True,
+    )
 
-    # 5. rejected_headlines cleanup — Daily 03:00 IST.
+    # 5. Outcome tracker — Mon-Fri 16:30 IST (after NSE close)
+    sched.add_job(
+        track_recommendation_outcomes,
+        CronTrigger(day_of_week="mon-fri", hour=16, minute=30, timezone=IST),
+        id="outcome_tracker",
+        name="Daily outcome tracker",
+        max_instances=1,
+        coalesce=True,
+    )
+
+    # 6. rejected_headlines cleanup — Daily 03:00 IST.
     sched.add_job(
         cleanup_rejected_headlines,
         CronTrigger(hour=3, minute=0, timezone=IST),
         id="rejected_headlines_cleanup",
         name="Daily rejected_headlines retention prune",
+        max_instances=1,
+        coalesce=True,
+    )
+
+    # 7. Pipeline checkpoint cleanup — Daily 03:05 IST.
+    sched.add_job(
+        cleanup_old_runs,
+        CronTrigger(hour=3, minute=5, timezone=IST),
+        id="checkpoint_cleanup",
+        name="Nightly pipeline checkpoint cleanup",
+        max_instances=1,
+        coalesce=True,
+    )
+
+    # 8. Position-aware alert monitor — Mon-Fri every 15 min, 09:15-15:30 IST.
+    sched.add_job(
+        lambda: asyncio.get_event_loop().run_in_executor(None, run_alert_monitor),
+        CronTrigger(
+            day_of_week="mon-fri",
+            hour="9-15",
+            minute="*/15",
+            timezone=IST,
+        ),
+        id="alert_monitor",
+        name="15-min position alert monitor (NSE hours)",
         max_instances=1,
         coalesce=True,
     )

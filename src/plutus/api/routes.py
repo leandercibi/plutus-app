@@ -1,14 +1,22 @@
 # api/routes.py
-from fastapi import APIRouter, Depends, HTTPException, Header
-from pydantic import BaseModel, Field
-from typing import Optional, List
-from plutus.config import settings
-from plutus.agents.graph import run_analysis
-from plutus.db.session import SessionLocal
-from plutus.db.models import Recommendation, WeeklyRun
+import asyncio
 import time
+import threading
+from typing import Optional, List
+
+from fastapi import APIRouter, Depends, HTTPException, Header, BackgroundTasks
+from pydantic import BaseModel, Field
+
+from plutus.agents.graph import run_analysis
+from plutus.config import settings
+from plutus.db.models import Recommendation, WeeklyRun
+from plutus.db.session import SessionLocal
 
 router = APIRouter()
+
+# Simple in-process lock to prevent concurrent pipeline runs
+_pipeline_lock = threading.Lock()
+_pipeline_running = False
 
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
@@ -94,11 +102,12 @@ async def analyze_stock(
 
     start_time = time.time()
     try:
-        result = run_analysis(symbol, exchange)
+        # run_analysis is CPU/IO-heavy + blocking — run in thread to free the event loop
+        result = await asyncio.to_thread(run_analysis, symbol, exchange)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=503, detail=f"Analysis failed: {str(e)}")
+        raise HTTPException(status_code=503, detail=f"Analysis failed: {type(e).__name__}: {str(e)}")
 
     elapsed = round(time.time() - start_time, 1)
 
@@ -179,6 +188,30 @@ async def get_weekly_recommendations(
             watch_signals=watch_signals,
             total_screened=latest_run.stocks_screened or 0,
         )
+
+
+@router.post("/pipeline/run", status_code=202)
+async def trigger_pipeline(
+    background_tasks: BackgroundTasks,
+    _: str = Depends(verify_api_key),
+):
+    """Trigger the weekly analysis pipeline. Returns 409 if already running."""
+    global _pipeline_running
+    with _pipeline_lock:
+        if _pipeline_running:
+            raise HTTPException(status_code=409, detail="Pipeline already running")
+        _pipeline_running = True
+
+    def run():
+        global _pipeline_running
+        try:
+            import asyncio
+            from main import weekly_pipeline
+            asyncio.run(weekly_pipeline())
+        finally:
+            _pipeline_running = False
+    background_tasks.add_task(run)
+    return {"status": "started"}
 
 
 @router.get("/health")

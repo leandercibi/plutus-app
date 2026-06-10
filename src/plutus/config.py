@@ -43,10 +43,16 @@ class Settings(BaseSettings):
     REDDIT_USER_AGENT: str = "plutus-trading-bot/1.0"
     REDDIT_ENABLED: bool = False
 
+    # --- Angel One SmartAPI ---
+    ANGEL_API_KEY: str = ""
+    ANGEL_CLIENT_ID: str = ""
+    ANGEL_PASSWORD: str = ""
+    ANGEL_TOTP_SECRET: str = ""
+
     # --- Internal API (plutus-main; FastAPI on 8000) ---
     API_SECRET_KEY: str = "change_this_in_production"
     API_HOST: str = "0.0.0.0"
-    API_PORT: int = 8000
+    API_PORT: int = 8009
 
     # --- API rate limit + symbol cache ---
     API_RATE_LIMIT_PER_HOUR: int = 30

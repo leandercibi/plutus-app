@@ -36,17 +36,13 @@ class TestWeeklyRunModel:
         assert run.market_regime == "BULLISH"
         assert run.stocks_screened == 150
     
-    def test_weekly_run_unique_date_constraint(self, test_db_session):
-        """Test that run_date must be unique."""
-        run1 = WeeklyRun(run_date=date(2026, 5, 25), stocks_screened=100)
-        test_db_session.add(run1)
+    def test_weekly_run_multiple_runs_same_date_allowed(self, test_db_session):
+        """Test that multiple runs on the same date are now allowed (scheduled + manual)."""
+        run1 = WeeklyRun(run_date=date(2026, 5, 25), run_type="scheduled", stocks_screened=100)
+        run2 = WeeklyRun(run_date=date(2026, 5, 25), run_type="manual", stocks_screened=150)
+        test_db_session.add_all([run1, run2])
         test_db_session.commit()
-        
-        run2 = WeeklyRun(run_date=date(2026, 5, 25), stocks_screened=150)
-        test_db_session.add(run2)
-        
-        with pytest.raises(Exception):  # IntegrityError
-            test_db_session.commit()
+        assert run1.id != run2.id
     
     def test_weekly_run_recommendations_relationship(self, weekly_run_factory, recommendation_factory):
         """Test one-to-many relationship with recommendations."""
@@ -543,6 +539,7 @@ class TestBacktestResultModel:
     def test_create_backtest_result(self, test_db_session):
         """Test creating a BacktestResult instance."""
         result = BacktestResult(
+            symbol="RELIANCE",
             bundle_name="trend",
             run_date=date(2026, 5, 25),
             win_rate=0.65,
@@ -566,6 +563,7 @@ class TestBacktestResultModel:
         
         for bundle in bundles:
             result = BacktestResult(
+                symbol="RELIANCE",
                 bundle_name=bundle,
                 run_date=run_date,
                 win_rate=0.6,

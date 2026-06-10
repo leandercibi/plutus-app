@@ -83,7 +83,15 @@ def fetch_news(symbol: str, hours: int = 48) -> List[Dict]:
         except Exception:
             continue
 
-    return results
+    # Deduplicate by normalised headline
+    seen: set = set()
+    unique: List[Dict] = []
+    for item in results:
+        key = item["headline"].lower().strip()
+        if key not in seen:
+            seen.add(key)
+            unique.append(item)
+    return unique
 
 
 def prefilter_headlines(headlines: List[Dict]) -> tuple[List[Dict], List[Dict]]:
@@ -147,11 +155,11 @@ def _llm_batch_classify(symbol: str, kept: List[Dict]) -> Dict:
     from plutus.agents.prompts import NEWS_CLASSIFIER_PROMPT
     headlines_text = "\n".join(f"- {h['headline']} ({h['source']})" for h in kept[:15])
     user_msg = f"Stock: {symbol}\nHeadlines:\n{headlines_text}"
-    response = call_llm([
-        {"role": "system", "content": NEWS_CLASSIFIER_PROMPT},
-        {"role": "user", "content": user_msg},
-    ], model=settings.DEEPSEEK_FAST_MODEL, response_format="json")
     try:
+        response = call_llm([
+            {"role": "system", "content": NEWS_CLASSIFIER_PROMPT},
+            {"role": "user", "content": user_msg},
+        ], model=settings.DEEPSEEK_FAST_MODEL, response_format="json")
         result = json.loads(response)
         return {
             "sentiment_score": result.get("sentiment_score", 0),

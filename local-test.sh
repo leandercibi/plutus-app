@@ -17,11 +17,18 @@ if ! command -v psql &> /dev/null; then
     exit 1
 fi
 
-# Check if postgres is running
-if ! pgrep -x postgres > /dev/null; then
-    echo "❌ PostgreSQL not running. Start with: brew services start postgresql@16"
-    exit 1
-fi
+# Restart database
+echo "Restarting PostgreSQL..."
+brew services restart postgresql@16
+sleep 3
+echo "✓ PostgreSQL restarted"
+
+# Replay all migrations
+echo "Applying migrations..."
+for f in "$PROJECT_ROOT"/migrations/*.sql; do
+    PGPASSWORD=plutus psql -h 127.0.0.1 -U plutus -d plutus_db -f "$f" > /dev/null 2>&1
+done
+echo "✓ Migrations applied"
 
 # Check if database exists
 if ! PGPASSWORD=plutus psql -h 127.0.0.1 -U plutus -d plutus_db -c "SELECT 1" &> /dev/null; then
@@ -53,9 +60,9 @@ echo ""
 
 # Check if ports are available
 echo "3. Checking ports..."
-if lsof -Pi :8000 -sTCP:LISTEN -t >/dev/null 2>&1; then
-    echo "⚠️  Port 8000 already in use (FastAPI)"
-    lsof -Pi :8000 -sTCP:LISTEN
+if lsof -Pi :8009 -sTCP:LISTEN -t >/dev/null 2>&1; then
+    echo "⚠️  Port 8009 already in use (FastAPI)"
+    lsof -Pi :8009 -sTCP:LISTEN
 fi
 
 if lsof -Pi :8501 -sTCP:LISTEN -t >/dev/null 2>&1; then
@@ -76,7 +83,7 @@ echo ""
 mkdir -p logs
 
 # Start FastAPI + Scheduler (main.py)
-echo "Starting plutus-main (FastAPI + Scheduler) on port 8000..."
+echo "Starting plutus-main (FastAPI + Scheduler) on port 8009..."
 cd src
 .venv/bin/python -c "
 import sys
@@ -96,12 +103,12 @@ cd ..
 sleep 3
 
 # Check if main started successfully
-if ! curl -s http://localhost:8000/healthz > /dev/null 2>&1; then
+if ! curl -s http://localhost:8009/healthz > /dev/null 2>&1; then
     echo "❌ FastAPI failed to start. Check logs/main.log"
     kill $MAIN_PID 2>/dev/null || true
     exit 1
 fi
-echo "✓ FastAPI running at http://localhost:8000"
+echo "✓ FastAPI running at http://localhost:8009"
 
 # Start Streamlit Dashboard
 echo ""
@@ -124,9 +131,9 @@ fi
 echo ""
 echo "=== Services Running ==="
 echo ""
-echo "FastAPI (main):      http://localhost:8000"
-echo "  - Health check:    http://localhost:8000/healthz"
-echo "  - API docs:        http://localhost:8000/docs"
+echo "FastAPI (main):      http://localhost:8009"
+echo "  - Health check:    http://localhost:8009/healthz"
+echo "  - API docs:        http://localhost:8009/docs"
 echo ""
 echo "Streamlit Dashboard: http://localhost:8501"
 echo ""
@@ -152,6 +159,6 @@ echo "=== Ready for Testing ==="
 echo ""
 echo "Try these commands:"
 echo "  1. Open dashboard:  open http://localhost:8501"
-echo "  2. Test API:        curl http://localhost:8000/healthz"
+echo "  2. Test API:        curl http://localhost:8009/healthz"
 echo "  3. View logs:       tail -f logs/main.log"
 echo ""

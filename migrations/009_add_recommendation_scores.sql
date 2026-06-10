@@ -1,0 +1,4 @@
+ALTER TABLE recommendations ADD COLUMN IF NOT EXISTS mfe_pct FLOAT;
+ALTER TABLE recommendations ADD COLUMN IF NOT EXISTS mae_pct FLOAT;
+ALTER TABLE recommendations ADD COLUMN IF NOT EXISTS regime_score FLOAT;
+ALTER TABLE recommendations ADD COLUMN IF NOT EXISTS rr_score FLOAT;

@@ -300,6 +300,8 @@ class TestLlmBatchClassify:
         news._llm_batch_classify("RELIANCE", kept)
         
         # Check that the user message contains only 15 headlines
+        # (count individual list items — "Headlines:" header also contains "Headline" once)
         call_args = mock_llm.call_args[0][0]
         user_msg = call_args[1]["content"]
-        assert user_msg.count("Headline") == 15
+        items = [ln for ln in user_msg.splitlines() if ln.startswith("- ")]
+        assert len(items) == 15

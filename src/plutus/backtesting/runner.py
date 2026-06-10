@@ -9,7 +9,7 @@ from typing import Dict, List
 import backtrader as bt
 
 from plutus.config import settings
-from plutus.data.ohlcv import fetch_ohlcv
+from plutus.data.ohlcv import fetch_ohlcv, InsufficientDataError
 from plutus.data.universe import get_universe
 from plutus.db.session import SessionLocal
 from plutus.db.models import BacktestResult, WeeklyRun
@@ -18,6 +18,8 @@ from plutus.strategies.bundle_reversal import ReversalBundle
 from plutus.strategies.bundle_breakout import BreakoutBundle
 from plutus.strategies.bundle_smc import SMCBundle
 from plutus.strategies.bundle_composite import CompositeBundle
+from plutus.strategies.bundle_vcp import VCPBundle
+from plutus.strategies.bundle_pead import PEADBundle
 
 
 log = logging.getLogger(__name__)
@@ -26,6 +28,11 @@ log = logging.getLogger(__name__)
 # ---------------------------------------------------------------------- #
 # Result type
 # ---------------------------------------------------------------------- #
+MIN_BARS_REQUIRED = 60
+SHARPE_SANE_MIN = -5.0
+SHARPE_SANE_MAX = 5.0
+
+
 @dataclass
 class BundleResult:
     """Per-bundle, per-symbol backtest summary."""
@@ -35,7 +42,9 @@ class BundleResult:
     max_drawdown_pct: float
     sharpe_ratio: float
     total_trades: int
-    trades: List[Dict] = field(default_factory=list)   # raw trade dicts from BaseStrategy.trade_log
+    trades: List[Dict] = field(default_factory=list)
+    warnings: List[str] = field(default_factory=list)
+    suspect: bool = False
 
 
 BUNDLE_MAP: Dict[str, type] = {
@@ -44,6 +53,8 @@ BUNDLE_MAP: Dict[str, type] = {
     "breakout":  BreakoutBundle,
     "smc":       SMCBundle,
     "composite": CompositeBundle,
+    "vcp":       VCPBundle,
+    "pead":      PEADBundle,
 }
 
 
@@ -57,27 +68,31 @@ def run_bundle(symbol: str, bundle_name: str, days: int = 90) -> BundleResult:
 
     try:
         df = fetch_ohlcv(symbol, days=days, interval="1d")
-        if df is None or len(df) < 30:
-            return _empty_result(bundle_name)
+        bars = len(df) if df is not None else 0
 
-        cerebro = bt.Cerebro(stdstats=False)
-        cerebro.addstrategy(BUNDLE_MAP[bundle_name])
-        cerebro.broker.setcash(settings.INITIAL_CAPITAL)
-        cerebro.broker.setcommission(commission=0.001)   # 0.1% per side, NSE-realistic
+        if bars < MIN_BARS_REQUIRED:
+            raise InsufficientDataError(bars, MIN_BARS_REQUIRED, symbol)
 
-        cerebro.adddata(bt.feeds.PandasData(dataname=df))
-        cerebro.addanalyzer(bt.analyzers.TradeAnalyzer, _name="trades")
-        cerebro.addanalyzer(bt.analyzers.DrawDown, _name="drawdown")
-        cerebro.addanalyzer(
-            bt.analyzers.SharpeRatio,
-            _name="sharpe",
-            riskfreerate=0.065,        # 6.5% Indian risk-free rate
-            annualize=True,
-        )
+        warnings: List[str] = []
+        if bars < days:
+            warnings.append(f"Only {bars}/{days} bars available — results may be less reliable")
 
-        results = cerebro.run()
+        engine = bt.Cerebro(stdstats=False)
+        engine.addstrategy(BUNDLE_MAP[bundle_name])
+        engine.broker.setcash(settings.INITIAL_CAPITAL)
+        engine.broker.setcommission(commission=0.001)   # 0.1% per side, NSE-realistic
+
+        engine.adddata(bt.feeds.PandasData(dataname=df))
+        engine.addanalyzer(bt.analyzers.TradeAnalyzer, _name="trades")
+        engine.addanalyzer(bt.analyzers.DrawDown, _name="drawdown")
+
+        results = engine.run()
         strat = results[0]
-        return _summarise(bundle_name, strat)
+        result = _summarise(bundle_name, strat)
+        result.warnings.extend(warnings)
+        return result
+    except InsufficientDataError:
+        raise
     except Exception:
         log.exception("run_bundle failed: symbol=%s bundle=%s", symbol, bundle_name)
         return _empty_result(bundle_name)
@@ -86,7 +101,6 @@ def run_bundle(symbol: str, bundle_name: str, days: int = 90) -> BundleResult:
 def _summarise(bundle_name: str, strat) -> BundleResult:
     ta = strat.analyzers.trades.get_analysis()
     dd = strat.analyzers.drawdown.get_analysis()
-    sh = strat.analyzers.sharpe.get_analysis()
 
     closed = ta.get("total", {}).get("closed", 0) or 0
     won = ta.get("won", {}).get("total", 0) or 0
@@ -99,7 +113,25 @@ def _summarise(bundle_name: str, strat) -> BundleResult:
         avg_return = 0.0
 
     max_dd = (dd.get("max", {}).get("drawdown", 0.0)) or 0.0
-    sharpe_val = sh.get("sharperatio") or 0.0
+
+    if trades and len(trades) >= 2:
+        returns = [t.get("pnl_pct", 0.0) for t in trades]
+        avg_ret = sum(returns) / len(returns)
+        std_ret = (sum((r - avg_ret) ** 2 for r in returns) / len(returns)) ** 0.5
+        sharpe_val = (avg_ret / std_ret) if std_ret > 0 else 0.0
+    elif trades and len(trades) == 1:
+        sharpe_val = 1.0 if trades[0].get("pnl_pct", 0) > 0 else -1.0
+    else:
+        sharpe_val = 0.0
+
+    suspect = not (SHARPE_SANE_MIN <= sharpe_val <= SHARPE_SANE_MAX)
+    sharpe_val = max(SHARPE_SANE_MIN, min(SHARPE_SANE_MAX, sharpe_val))
+
+    result_warnings: List[str] = []
+    if suspect:
+        result_warnings.append(f"Sharpe {round(sharpe_val, 3)} outside sane range [{SHARPE_SANE_MIN}, {SHARPE_SANE_MAX}] — flagged as suspect")
+    if closed == 0:
+        result_warnings.append("No trades generated — strategy produced no signals")
 
     return BundleResult(
         bundle_name=bundle_name,
@@ -109,6 +141,8 @@ def _summarise(bundle_name: str, strat) -> BundleResult:
         sharpe_ratio=round(sharpe_val, 3),
         total_trades=closed,
         trades=trades,
+        warnings=result_warnings,
+        suspect=suspect,
     )
 
 
@@ -128,12 +162,12 @@ def _empty_result(bundle_name: str) -> BundleResult:
 # 5-bundle batch runner
 # ---------------------------------------------------------------------- #
 def run_all_bundles(symbol: str, days: int = 90) -> Dict[str, BundleResult]:
-    """Run all 5 peer bundles on a symbol. Returns a dict with exactly 5 keys."""
+    """Run all registered bundles on a symbol. Returns a dict keyed by bundle name."""
     return {name: run_bundle(symbol, name, days=days) for name in BUNDLE_MAP}
 
 
 def select_best_bundles(results: Dict[str, BundleResult]) -> List[str]:
-    """Top 2 bundle names by Sharpe across all 5 candidates.
+    """Top 2 bundle names by Sharpe from the provided results dict.
 
     Bundles with `total_trades == 0` are demoted (treated as Sharpe = -inf) so
     we never pick a bundle that did not actually trade in the window.
@@ -144,7 +178,7 @@ def select_best_bundles(results: Dict[str, BundleResult]) -> List[str]:
             return float("-inf")
         return r.sharpe_ratio
 
-    ordered = sorted(BUNDLE_MAP.keys(), key=key, reverse=True)
+    ordered = sorted(results.keys(), key=key, reverse=True)
     return ordered[:2]
 
 

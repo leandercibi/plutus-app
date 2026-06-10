@@ -37,25 +37,19 @@ class TestRunBundle:
     
     @patch('plutus.backtesting.runner.fetch_ohlcv')
     def test_run_bundle_insufficient_data(self, mock_fetch, sample_ohlcv_insufficient):
-        """Test bundle with insufficient data returns empty result."""
+        """Insufficient data raises InsufficientDataError (not silently swallowed)."""
         mock_fetch.return_value = sample_ohlcv_insufficient
-        
-        result = run_bundle("RELIANCE", "trend", days=90)
-        
-        assert result.bundle_name == "trend"
-        assert result.win_rate == 0.0
-        assert result.total_trades == 0
-        assert result.trades == []
-    
+        from plutus.data.ohlcv import InsufficientDataError
+        with pytest.raises(InsufficientDataError):
+            run_bundle("RELIANCE", "trend", days=90)
+
     @patch('plutus.backtesting.runner.fetch_ohlcv')
     def test_run_bundle_no_data(self, mock_fetch):
-        """Test bundle with no data returns empty result."""
+        """None data raises InsufficientDataError (0 bars < MIN_BARS_REQUIRED)."""
         mock_fetch.return_value = None
-        
-        result = run_bundle("INVALID", "trend", days=90)
-        
-        assert result.bundle_name == "trend"
-        assert result.total_trades == 0
+        from plutus.data.ohlcv import InsufficientDataError
+        with pytest.raises(InsufficientDataError):
+            run_bundle("INVALID", "trend", days=90)
     
     @patch('plutus.backtesting.runner.fetch_ohlcv')
     def test_run_bundle_invalid_bundle_name(self, mock_fetch, sample_ohlcv_uptrend):
@@ -104,8 +98,8 @@ class TestRunAllBundles:
         mock_fetch.return_value = sample_ohlcv_uptrend
         
         results = run_all_bundles("RELIANCE", days=90)
-        
-        assert len(results) == 5
+
+        assert len(results) == len(BUNDLE_MAP)
         assert set(results.keys()) == set(BUNDLE_MAP.keys())
         
         for bundle_name, result in results.items():
@@ -114,14 +108,11 @@ class TestRunAllBundles:
     
     @patch('plutus.backtesting.runner.fetch_ohlcv')
     def test_run_all_bundles_with_no_data(self, mock_fetch):
-        """Test run_all_bundles with no data returns empty results."""
+        """run_all_bundles with no data propagates InsufficientDataError."""
         mock_fetch.return_value = None
-        
-        results = run_all_bundles("INVALID", days=90)
-        
-        assert len(results) == 5
-        for result in results.values():
-            assert result.total_trades == 0
+        from plutus.data.ohlcv import InsufficientDataError
+        with pytest.raises(InsufficientDataError):
+            run_all_bundles("INVALID", days=90)
 
 
 class TestSelectBestBundles:

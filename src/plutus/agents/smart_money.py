@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json
 
-from plutus.agents.openrouter_client import call_llm
+from plutus.agents.openrouter_client import call_llm, _parse_llm_json
 from plutus.agents.prompts import SMART_MONEY_PROMPT
 from plutus.config import settings
 
@@ -29,4 +29,4 @@ Interpret institutional activity for this stock."""
         response_format={"type": "json_object"},
         temperature=0.2,
     )
-    return json.loads(response)
+    return _parse_llm_json(response)

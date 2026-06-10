@@ -1,6 +1,8 @@
 # plutus/agents/openrouter_client.py
 from __future__ import annotations
 
+import json
+import re
 import time
 from typing import Optional
 
@@ -120,3 +122,15 @@ def call_llm(
                 total_tokens=usage.get("total_tokens"),
             )
             return content
+
+
+def _parse_llm_json(response: str) -> dict:
+    """Parse LLM JSON response, stripping markdown fences if present."""
+    if not response:
+        return {}
+    text = re.sub(r"^```(?:json)?\s*|\s*```$", "", response.strip(), flags=re.MULTILINE)
+    try:
+        parsed = json.loads(text)
+        return parsed if isinstance(parsed, dict) else {}
+    except json.JSONDecodeError:
+        return {}

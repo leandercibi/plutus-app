@@ -547,13 +547,13 @@ async def test_cleanup_rejected_headlines(test_db_session, monkeypatch):
         symbol="OLD",
         headline="Old headline",
         rejected_at=old_date,
-        rejection_reason="stoplist",
+        filter_status="stoplist",
     ))
     test_db_session.add(RejectedHeadline(
         symbol="RECENT",
         headline="Recent headline",
         rejected_at=recent_date,
-        rejection_reason="stoplist",
+        filter_status="stoplist",
     ))
     test_db_session.commit()
     
@@ -602,33 +602,36 @@ async def test_push_to_bot_failure(mock_client_class):
     mock_client = AsyncMock()
     mock_client.post = AsyncMock(side_effect=Exception("Network error"))
     mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-    mock_client.__aexit__ = AsyncMock()
-    
+    mock_client.__aexit__ = AsyncMock(return_value=False)  # must be falsy to propagate exception
+
     mock_client_class.return_value = mock_client
-    
+
     result = await _push_to_bot("/push/test", {"data": "test"})
-    
+
     assert result is False  # Should not raise, returns False
 
 
 # ── Scheduler Build Tests ─────────────────────────────────────────────────
 
 def test_build_scheduler():
-    """Test scheduler is built with all 5 jobs."""
+    """Test scheduler is built with all 8 jobs."""
     from main import build_scheduler
-    
+
     scheduler = build_scheduler()
     jobs = scheduler.get_jobs()
-    
-    assert len(jobs) == 5
-    
+
+    assert len(jobs) == 8
+
     job_ids = {job.id for job in jobs}
     expected_ids = {
         "weekly_pipeline",
         "weekly_revalidate",
         "news_monitor",
+        "self_finetuning",
         "outcome_tracker",
         "rejected_headlines_cleanup",
+        "checkpoint_cleanup",
+        "alert_monitor",
     }
     assert job_ids == expected_ids
 

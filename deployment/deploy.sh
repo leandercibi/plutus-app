@@ -1,5 +1,7 @@
 #!/bin/bash
 set -e
+export PAGER=cat
+export PGPASSWORD=plutus
 
 # Plutus Deployment Script for Ubuntu 22.04 (ARM64)
 # Consolidates Steps 1-7 from 15_deployment.md
@@ -38,7 +40,7 @@ GRANT ALL PRIVILEGES ON DATABASE plutus_db TO plutus;
 EOF
 
 # Test connection
-psql -U plutus -d plutus_db -h 127.0.0.1 -c "SELECT version();"
+PGPASSWORD=plutus psql -U plutus -d plutus_db -h 127.0.0.1 --no-psqlrc -t -c "SELECT version();"
 
 echo "=== Step 3: Clone / Upload Project ==="
 echo "Note: This script assumes project is already at /home/ubuntu/plutus-app/"

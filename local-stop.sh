@@ -34,9 +34,9 @@ fi
 
 # Fallback: kill by port
 echo ""
-echo "Checking for any remaining processes on ports 8000, 8501..."
+echo "Checking for any remaining processes on ports 8009, 8501..."
 
-for port in 8000 8501; do
+for port in 8009 8501; do
     PID=$(lsof -ti:$port 2>/dev/null)
     if [ ! -z "$PID" ]; then
         echo "  Killing process on port $port (PID: $PID)"
@@ -46,3 +46,8 @@ done
 
 echo ""
 echo "✓ All services stopped"
+
+# Restart database
+echo "Restarting PostgreSQL..."
+brew services restart postgresql@16
+echo "✓ PostgreSQL restarted"

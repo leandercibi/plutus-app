@@ -57,7 +57,6 @@ class PaperTrader:
             portfolio = MockPortfolio(
                 name=name,
                 initial_capital=initial_capital,
-                current_cash=initial_capital,
                 notes=notes,
             )
             db.add(portfolio)
@@ -162,7 +161,6 @@ class PaperTrader:
                 status=TradeStatus.OPEN,
                 linked_recommendation_id=recommendation_id,
             )
-            portfolio.current_cash = float(portfolio.current_cash) - capital_used
             db.add(trade)
             db.commit()
             db.refresh(trade)
@@ -248,7 +246,6 @@ class PaperTrader:
                 trade.shares = remaining
                 trade.capital_used = float(trade.capital_used) - (entry * close_shares)
 
-            portfolio.current_cash = float(portfolio.current_cash) + proceeds
             db.commit()
 
             return {
@@ -334,11 +331,14 @@ class PaperTrader:
                 unrealised_pnl += (ltp - float(t.entry_price)) * t.shares
                 mtm_value += ltp * t.shares
 
-            current_value = float(portfolio.current_cash) + mtm_value
+            open_capital = sum(float(t.capital_used or 0) for t in open_trades)
+            closed_pnl = sum(float(t.realised_pnl or 0) for t in closed)
+            cash = float(portfolio.initial_capital) - open_capital + closed_pnl
+            current_value = cash + mtm_value
 
             return {
                 "initial_capital": float(portfolio.initial_capital),
-                "current_cash": round(float(portfolio.current_cash), 2),
+                "current_cash": round(cash, 2),
                 "current_value": round(current_value, 2),
                 "realised_pnl": round(realised_pnl, 2),
                 "unrealised_pnl": round(unrealised_pnl, 2),

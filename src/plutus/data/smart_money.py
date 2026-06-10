@@ -1,42 +1,20 @@
 # src/plutus/data/smart_money.py
-from mftool import Mftool
 import requests
 from typing import Dict, List
 from datetime import date
 
+from plutus.data.tickertape import get_mf_holdings_delta as _tt_mf_delta
+
 
 def get_mf_signal(symbol: str) -> Dict:
     """
-    Checks if mutual funds are accumulating or reducing holdings.
-    Data: AMFI monthly portfolio disclosures (45-day lag).
-    Returns: {verdict, mf_count_accumulating, mf_count_reducing, details}
-    """
-    try:
-        Mftool()  # ensure import path works; stock-level lookup is custom
-        return _scrape_nse_mf_holdings(symbol)
-    except Exception:
-        return {"verdict": "UNKNOWN", "mf_count_accumulating": 0, "mf_count_reducing": 0}
+    Returns MF accumulation signal for a symbol.
+    Delegates to tickertape.get_mf_holdings_delta() which maintains a 24h
+    disk cache and falls back to UNKNOWN on any network failure.
 
-
-def _scrape_nse_mf_holdings(symbol: str) -> Dict:
+    Returns: {verdict, change_pct, mf_count}
     """
-    Scrapes NSE/AMFI for mutual fund holdings change.
-    NSE provides MF aggregate data at:
-    https://www.nseindia.com/api/mutual-funds-equity-report
-    """
-    try:
-        url = f"https://api.tickertape.in/stocks/{symbol}/holders"
-        resp = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
-        if resp.status_code == 200:
-            return {
-                "verdict": "UNKNOWN",
-                "mf_count_accumulating": 0,
-                "mf_count_reducing": 0,
-                "details": [],
-            }
-    except Exception:
-        pass
-    return {"verdict": "UNKNOWN", "mf_count_accumulating": 0, "mf_count_reducing": 0}
+    return _tt_mf_delta(symbol)
 
 
 def get_fii_dii_flow() -> Dict:

@@ -15,6 +15,7 @@ from pathlib import Path
 from decimal import Decimal
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 
 from plutus.db.session import Base
 from plutus.db.models import (
@@ -33,7 +34,8 @@ def test_db_engine():
     engine = create_engine(
         "sqlite:///:memory:",
         echo=False,
-        connect_args={"check_same_thread": False}  # Allow multi-threaded access for FastAPI TestClient
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,  # ensure all connections share the same in-memory DB
     )
     Base.metadata.create_all(engine)
     return engine
@@ -252,6 +254,38 @@ def paper_trade_factory(test_db_session):
 
 
 # ── OHLCV Fixtures for Strategy Testing ───────────────────────────────────
+
+@pytest.fixture
+def sample_keywords_yaml(tmp_path):
+    """Create a minimal keywords YAML file for news tests."""
+    content = """tier_A:
+  - earnings
+  - profit
+  - revenue
+tier_B:
+  - expansion
+  - merger
+stoplist:
+  - rumor
+  - speculation
+"""
+    f = tmp_path / "keywords.yaml"
+    f.write_text(content)
+    return f
+
+
+@pytest.fixture
+def sample_holidays_file(tmp_path):
+    """Create a holidays text file with 3 dates for calendar tests."""
+    content = """# NSE Holidays
+2026-01-26
+2026-08-15
+2026-10-02
+"""
+    f = tmp_path / "holidays.txt"
+    f.write_text(content)
+    return f
+
 
 @pytest.fixture
 def sample_ohlcv_uptrend():
