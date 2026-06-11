@@ -27,8 +27,8 @@ from plutus.db.models import (
 )
 from plutus.data.ohlcv import fetch_ohlcv, fetch_live_price, add_indicators
 
-API_BASE = f"http://127.0.0.1:{settings.API_PORT}"   # default http://127.0.0.1:8000 — /analyze goes through cache + rate limit
-API_KEY = settings.API_SECRET_KEY                            # local API key for self-calls
+API_BASE = f"http://127.0.0.1:{settings.API_PORT}"  # default http://127.0.0.1:8000 — /analyze goes through cache + rate limit
+API_KEY = settings.API_SECRET_KEY  # local API key for self-calls
 
 st.set_page_config(
     page_title="Plutus — Indian Equities Recommendation Engine",
@@ -37,16 +37,18 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-tabs = st.tabs([
-    "🏠 Home",
-    "📊 Signals",
-    "💼 Portfolio",
-    "🧪 Strategy Lab",
-    "📰 News Feed",
-    "👁 Watchlist",
-    "📋 History",
-    "⚙️ Settings",
-])
+tabs = st.tabs(
+    [
+        "🏠 Home",
+        "📊 Signals",
+        "💼 Portfolio",
+        "🧪 Strategy Lab",
+        "📰 News Feed",
+        "👁 Watchlist",
+        "📋 History",
+        "⚙️ Settings",
+    ]
+)
 
 # ── Helper Functions ──────────────────────────────────────────────────────
 
@@ -64,6 +66,7 @@ def _get_latest_recs(db, run_id: int) -> List[Recommendation]:
 
 def _get_portfolio_data(name: str) -> Dict[str, Any]:
     from plutus.backtesting.paper_trader import PaperTrader
+
     return PaperTrader(name).get_summary()
 
 
@@ -77,20 +80,34 @@ def _render_stock_chart(symbol: str, days: int = 60) -> None:
         df = add_indicators(fetch_ohlcv(symbol, days=fetch_days))
         df = df.tail(days)
         fig = go.Figure()
-        fig.add_trace(go.Candlestick(
-            x=df.index, open=df["Open"], high=df["High"],
-            low=df["Low"], close=df["Close"], name=symbol,
-        ))
+        fig.add_trace(
+            go.Candlestick(
+                x=df.index,
+                open=df["Open"],
+                high=df["High"],
+                low=df["Low"],
+                close=df["Close"],
+                name=symbol,
+            )
+        )
         if "EMA_21" in df.columns:
-            fig.add_trace(go.Scatter(
-                x=df.index, y=df["EMA_21"], name="EMA21",
-                line=dict(color="blue", width=1),
-            ))
+            fig.add_trace(
+                go.Scatter(
+                    x=df.index,
+                    y=df["EMA_21"],
+                    name="EMA21",
+                    line=dict(color="blue", width=1),
+                )
+            )
         if "EMA_50" in df.columns:
-            fig.add_trace(go.Scatter(
-                x=df.index, y=df["EMA_50"], name="EMA50",
-                line=dict(color="orange", width=1.5),
-            ))
+            fig.add_trace(
+                go.Scatter(
+                    x=df.index,
+                    y=df["EMA_50"],
+                    name="EMA50",
+                    line=dict(color="orange", width=1.5),
+                )
+            )
         fig.update_layout(
             title=f"{symbol} — {days}-day chart",
             xaxis_rangeslider_visible=False,
@@ -112,7 +129,6 @@ def _render_analyze_result(symbol: str, exchange: str = "NSE") -> None:
     _render_analyze_result_impl(symbol, exchange, API_BASE, API_KEY)
 
 
-
 def _suggest_keyword(headline: str) -> str:
     """Heuristic: pick the longest non-stopword token from the headline."""
     stop = {"the", "and", "for", "with", "from", "this", "that", "into", "over"}
@@ -127,6 +143,7 @@ def _quarter_key(d: date) -> str:
 
 def _outcome_stats_for_run(run_id: int) -> Dict[str, int]:
     from plutus.db.models import OutcomeVerdict
+
     with SessionLocal() as db:
         rows = (
             db.query(Recommendation.outcome, func.count(Recommendation.id))
@@ -161,17 +178,22 @@ def _render_history_drilldown(run: WeeklyRun) -> None:
             .all()
         )
     if recs:
-        rec_df = pd.DataFrame([{
-            "Symbol": r.symbol,
-            "Signal": r.recommendation.value,
-            "Score": r.confidence,
-            "Entry Mid": r.entry_mid,
-            "T1": r.target1,
-            "Stop": r.stop_loss,
-            "Outcome": r.outcome.value if r.outcome else "PENDING",
-            "P&L %": r.outcome_pct,
-            "Exit Date": r.outcome_exit_date,
-        } for r in recs])
+        rec_df = pd.DataFrame(
+            [
+                {
+                    "Symbol": r.symbol,
+                    "Signal": r.recommendation.value,
+                    "Score": r.confidence,
+                    "Entry Mid": r.entry_mid,
+                    "T1": r.target1,
+                    "Stop": r.stop_loss,
+                    "Outcome": r.outcome.value if r.outcome else "PENDING",
+                    "P&L %": r.outcome_pct,
+                    "Exit Date": r.outcome_exit_date,
+                }
+                for r in recs
+            ]
+        )
         st.subheader("Recommendations")
         st.dataframe(rec_df, use_container_width=True, hide_index=True)
 
@@ -191,13 +213,17 @@ def _render_history_drilldown(run: WeeklyRun) -> None:
     closed = [r for r in recs if r.outcome_pct is not None and r.outcome_exit_date]
     if closed:
         closed.sort(key=lambda r: r.outcome_exit_date)
-        eq = pd.DataFrame({
-            "exit_date": [r.outcome_exit_date for r in closed],
-            "pnl_pct": [r.outcome_pct for r in closed],
-        })
+        eq = pd.DataFrame(
+            {
+                "exit_date": [r.outcome_exit_date for r in closed],
+                "pnl_pct": [r.outcome_pct for r in closed],
+            }
+        )
         eq["cum_pnl_pct"] = eq["pnl_pct"].cumsum()
         fig = px.line(
-            eq, x="exit_date", y="cum_pnl_pct",
+            eq,
+            x="exit_date",
+            y="cum_pnl_pct",
             title="Cumulative P&L % (closed recs from this run)",
         )
         fig.add_hline(y=0, line_dash="dash", line_color="gray")
@@ -207,9 +233,16 @@ def _render_history_drilldown(run: WeeklyRun) -> None:
 def _redacted_env_summary() -> Dict[str, Any]:
     """Show env-derived settings, redacting anything that looks like a secret."""
     secret_keys = {
-        "API_KEY", "API_SECRET_KEY", "OPENROUTER_API_KEY", "DEEPSEEK_API_KEY",
-        "TELEGRAM_BOT_TOKEN", "NEWS_API_KEY", "REDDIT_CLIENT_SECRET",
-        "REDDIT_CLIENT_ID", "DB_PASSWORD", "WHATSAPP_API_KEY",
+        "API_KEY",
+        "API_SECRET_KEY",
+        "OPENROUTER_API_KEY",
+        "DEEPSEEK_API_KEY",
+        "TELEGRAM_BOT_TOKEN",
+        "NEWS_API_KEY",
+        "REDDIT_CLIENT_SECRET",
+        "REDDIT_CLIENT_ID",
+        "DB_PASSWORD",
+        "WHATSAPP_API_KEY",
     }
     out: Dict[str, Any] = {}
     for field in settings.model_fields:  # pydantic-settings v2
@@ -224,6 +257,7 @@ def _redacted_env_summary() -> Dict[str, Any]:
 def _service_status() -> Dict[str, str]:
     """systemctl is-active for each plutus-* unit; falls back to 'unknown'."""
     import subprocess
+
     units = [
         "plutus-main.service",
         "plutus-bot.service",
@@ -235,12 +269,15 @@ def _service_status() -> Dict[str, str]:
         try:
             r = subprocess.run(
                 ["systemctl", "is-active", u],
-                capture_output=True, text=True, timeout=2,
+                capture_output=True,
+                text=True,
+                timeout=2,
             )
             out[u] = (r.stdout or r.stderr).strip() or "unknown"
         except Exception:
             out[u] = "unknown"
     return out
+
 
 # ── Tab Implementations ───────────────────────────────────────────────────
 
@@ -249,9 +286,7 @@ with tabs[0]:
     st.caption(f"Loaded: {datetime.now().strftime('%d %b %Y %H:%M')} IST")
 
     with SessionLocal() as db:
-        latest_run = (
-            db.query(WeeklyRun).order_by(WeeklyRun.id.desc()).first()
-        )
+        latest_run = db.query(WeeklyRun).order_by(WeeklyRun.id.desc()).first()
         if not latest_run:
             st.info("No weekly analysis yet. Next run: Sunday 18:00 IST.")
 
@@ -266,7 +301,9 @@ with tabs[0]:
                     if r.status_code == 409:
                         st.warning("Pipeline is already running.")
                     elif r.status_code in (200, 202):
-                        st.success("Pipeline started. Results will appear after completion.")
+                        st.success(
+                            "Pipeline started. Results will appear after completion."
+                        )
                     else:
                         st.error(f"Failed to start pipeline: {r.status_code} {r.text}")
                 except Exception as e:
@@ -301,15 +338,15 @@ with tabs[0]:
                     if rec.revalidation_note:
                         st.warning(f"Monday revalidation: {rec.revalidation_note}")
                     st.write(rec.reasoning_text)
-                    if st.button(f"🔄 Run /analyze for {rec.symbol}", key=f"home_an_{rec.id}"):
+                    if st.button(
+                        f"🔄 Run /analyze for {rec.symbol}", key=f"home_an_{rec.id}"
+                    ):
                         _render_analyze_result(rec.symbol, rec.exchange or "NSE")
 with tabs[1]:
     st.title("📊 Signal Board")
 
     with SessionLocal() as db:
-        latest_run = (
-            db.query(WeeklyRun).order_by(WeeklyRun.id.desc()).first()
-        )
+        latest_run = db.query(WeeklyRun).order_by(WeeklyRun.id.desc()).first()
         if not latest_run:
             st.info("No data yet.")
         else:
@@ -318,7 +355,9 @@ with tabs[1]:
                 latest_run.market_regime or "", "⚪"
             )
             b1, b2, b3, b4 = st.columns(4)
-            b1.metric("Nifty Regime", f"{reg_color} {latest_run.market_regime or 'N/A'}")
+            b1.metric(
+                "Nifty Regime", f"{reg_color} {latest_run.market_regime or 'N/A'}"
+            )
             b2.metric("Nifty Trend", latest_run.nifty_trend or "N/A")
             b3.metric("BUY Signals", latest_run.total_buy_signals or 0)
             b4.metric("WATCH Signals", latest_run.total_watch_signals or 0)
@@ -340,35 +379,39 @@ with tabs[1]:
                 t2 = float(r.target2) if r.target2 else None
                 sl_dist = (
                     round((entry_mid - sl) / entry_mid * 100, 2)
-                    if entry_mid and sl and entry_mid > 0 else None
+                    if entry_mid and sl and entry_mid > 0
+                    else None
                 )
                 t1_dist = (
                     round((t1 - entry_mid) / entry_mid * 100, 2)
-                    if entry_mid and t1 and entry_mid > 0 else None
+                    if entry_mid and t1 and entry_mid > 0
+                    else None
                 )
 
-                rows.append({
-                    "Symbol": r.symbol,
-                    "Signal": r.recommendation.value,
-                    "Score /10": r.confidence,
-                    "Tech": r.technical_score,
-                    "Sent": r.sentiment_score,
-                    "SmMny": r.smart_money_score,
-                    "Regime": r.regime_score,
-                    "R:R score": r.rr_score,
-                    "Entry Mid": entry_mid,
-                    "SL": sl,
-                    "SL dist%": sl_dist,
-                    "T1": t1,
-                    "T1 dist%": t1_dist,
-                    "T2": t2,
-                    "R:R": r.rr_ratio,
-                    "Hold (min)": r.hold_days_min,
-                    "Hold (max)": r.hold_days_max,
-                    "Strategy": r.strategy_used,
-                    "Revalidation": r.revalidation_note or "",
-                    "Outcome": r.outcome.value if r.outcome else "PENDING",
-                })
+                rows.append(
+                    {
+                        "Symbol": r.symbol,
+                        "Signal": r.recommendation.value,
+                        "Score /10": r.confidence,
+                        "Tech": r.technical_score,
+                        "Sent": r.sentiment_score,
+                        "SmMny": r.smart_money_score,
+                        "Regime": r.regime_score,
+                        "R:R score": r.rr_score,
+                        "Entry Mid": entry_mid,
+                        "SL": sl,
+                        "SL dist%": sl_dist,
+                        "T1": t1,
+                        "T1 dist%": t1_dist,
+                        "T2": t2,
+                        "R:R": r.rr_ratio,
+                        "Hold (min)": r.hold_days_min,
+                        "Hold (max)": r.hold_days_max,
+                        "Strategy": r.strategy_used,
+                        "Revalidation": r.revalidation_note or "",
+                        "Outcome": r.outcome.value if r.outcome else "PENDING",
+                    }
+                )
             df = pd.DataFrame(rows)
 
             signal_filter = st.multiselect(
@@ -383,11 +426,17 @@ with tabs[1]:
             df = _drop_empty_revalidation(df)
 
             # ── Sub-score visibility toggle ──────────────────────────
-            show_sub = st.checkbox("Show sub-score pillars", value=False, key="sig_show_sub")
+            show_sub = st.checkbox(
+                "Show sub-score pillars", value=False, key="sig_show_sub"
+            )
             display_df = df.copy()
             if not show_sub:
                 display_df = display_df.drop(
-                    columns=[c for c in ["Tech", "Sent", "SmMny", "Regime", "R:R score"] if c in display_df.columns],
+                    columns=[
+                        c
+                        for c in ["Tech", "Sent", "SmMny", "Regime", "R:R score"]
+                        if c in display_df.columns
+                    ],
                     errors="ignore",
                 )
 
@@ -397,16 +446,24 @@ with tabs[1]:
                 hide_index=True,
                 column_config={
                     "Score /10": st.column_config.ProgressColumn(
-                        min_value=0, max_value=10, format="%.1f",
+                        min_value=0,
+                        max_value=10,
+                        format="%.1f",
                     ),
-                    "Tech":     st.column_config.NumberColumn(format="%.0f", width="small"),
-                    "Sent":     st.column_config.NumberColumn(format="%.0f", width="small"),
-                    "SmMny":    st.column_config.NumberColumn(format="%.0f", width="small"),
-                    "Regime":   st.column_config.NumberColumn(format="%.0f", width="small"),
-                    "R:R score": st.column_config.NumberColumn(format="%.0f", width="small"),
+                    "Tech": st.column_config.NumberColumn(format="%.0f", width="small"),
+                    "Sent": st.column_config.NumberColumn(format="%.0f", width="small"),
+                    "SmMny": st.column_config.NumberColumn(
+                        format="%.0f", width="small"
+                    ),
+                    "Regime": st.column_config.NumberColumn(
+                        format="%.0f", width="small"
+                    ),
+                    "R:R score": st.column_config.NumberColumn(
+                        format="%.0f", width="small"
+                    ),
                     "SL dist%": st.column_config.NumberColumn(format="%.2f%%"),
                     "T1 dist%": st.column_config.NumberColumn(format="%.2f%%"),
-                    "R:R":      st.column_config.NumberColumn(format="%.2f×"),
+                    "R:R": st.column_config.NumberColumn(format="%.2f×"),
                 },
             )
 
@@ -428,15 +485,26 @@ with tabs[2]:
     # ── Create new portfolio ─────────────────────────────────────────────
     with st.expander("+ Create New Portfolio", expanded=not portfolios):
         np_col1, np_col2, np_col3 = st.columns([2, 2, 1])
-        new_name = np_col1.text_input("Portfolio Name", placeholder="e.g. swing_2026", key="new_port_name")
-        new_capital = np_col2.number_input("Initial Capital (₹)", min_value=10000, max_value=10_000_000,
-                                           value=100000, step=10000, key="new_port_capital")
+        new_name = np_col1.text_input(
+            "Portfolio Name", placeholder="e.g. swing_2026", key="new_port_name"
+        )
+        new_capital = np_col2.number_input(
+            "Initial Capital (₹)",
+            min_value=10000,
+            max_value=10_000_000,
+            value=100000,
+            step=10000,
+            key="new_port_capital",
+        )
         if np_col3.button("Create", type="primary", key="new_port_btn"):
             if new_name.strip():
                 from plutus.backtesting.paper_trader import PaperTrader
+
                 try:
                     PaperTrader.create_portfolio(new_name.strip(), float(new_capital))
-                    st.success(f"Portfolio '{new_name.strip()}' created with ₹{new_capital:,.0f}")
+                    st.success(
+                        f"Portfolio '{new_name.strip()}' created with ₹{new_capital:,.0f}"
+                    )
                     st.rerun()
                 except Exception as exc:
                     st.error(f"Failed: {exc}")
@@ -467,14 +535,14 @@ with tabs[2]:
     if hist:
         df_hist = pd.DataFrame(hist)
         winners = df_hist[df_hist["realised_pnl"] > 0]["realised_pnl_pct"]
-        losers  = df_hist[df_hist["realised_pnl"] <= 0]["realised_pnl_pct"]
-        avg_win  = winners.mean() if len(winners) else 0.0
-        avg_loss = losers.mean()  if len(losers)  else 0.0
+        losers = df_hist[df_hist["realised_pnl"] <= 0]["realised_pnl_pct"]
+        avg_win = winners.mean() if len(winners) else 0.0
+        avg_loss = losers.mean() if len(losers) else 0.0
         win_rate_dec = summary["win_rate"] / 100
         expectancy = (win_rate_dec * avg_win) + ((1 - win_rate_dec) * avg_loss)
         ea, eb, ec = st.columns(3)
         ea.metric("Avg Winner", f"{avg_win:.2f}%")
-        eb.metric("Avg Loser",  f"{avg_loss:.2f}%")
+        eb.metric("Avg Loser", f"{avg_loss:.2f}%")
         ec.metric("Expectancy", f"{expectancy:.2f}%")
 
     st.divider()
@@ -482,25 +550,41 @@ with tabs[2]:
     # ── Open Positions ───────────────────────────────────────────────────
     st.subheader("Open Positions")
     from plutus.backtesting.paper_trader import PaperTrader
+
     trader = PaperTrader(selected)
     positions = trader.get_positions()
     if positions:
         pos_df = pd.DataFrame(positions)
         pos_df["entry_date"] = pd.to_datetime(pos_df["entry_date"])
         pos_df["days_held"] = (pd.Timestamp.now() - pos_df["entry_date"]).dt.days
-        display_cols = ["symbol", "shares", "entry_price", "current_price",
-                        "unrealised_pnl", "unrealised_pnl_pct", "capital_used",
-                        "days_held", "strategy_used"]
+        display_cols = [
+            "symbol",
+            "shares",
+            "entry_price",
+            "current_price",
+            "unrealised_pnl",
+            "unrealised_pnl_pct",
+            "capital_used",
+            "days_held",
+            "strategy_used",
+        ]
         pos_df = pos_df[[c for c in display_cols if c in pos_df.columns]]
         st.dataframe(
-            pos_df.rename(columns={
-                "symbol": "Symbol", "shares": "Shares",
-                "entry_price": "Entry ₹", "current_price": "LTP ₹",
-                "unrealised_pnl": "Unreal. P&L ₹", "unrealised_pnl_pct": "Unreal. %",
-                "capital_used": "Capital ₹", "days_held": "Days Held",
-                "strategy_used": "Strategy",
-            }),
-            use_container_width=True, hide_index=True,
+            pos_df.rename(
+                columns={
+                    "symbol": "Symbol",
+                    "shares": "Shares",
+                    "entry_price": "Entry ₹",
+                    "current_price": "LTP ₹",
+                    "unrealised_pnl": "Unreal. P&L ₹",
+                    "unrealised_pnl_pct": "Unreal. %",
+                    "capital_used": "Capital ₹",
+                    "days_held": "Days Held",
+                    "strategy_used": "Strategy",
+                }
+            ),
+            use_container_width=True,
+            hide_index=True,
             column_config={
                 "Unreal. %": st.column_config.NumberColumn(format="%.2f%%"),
             },
@@ -517,14 +601,21 @@ with tabs[2]:
             df_ec = pd.DataFrame(hist).sort_values("exit_date")
             df_ec["cum_pnl"] = df_ec["realised_pnl"].cumsum()
             fig_ec = go.Figure()
-            fig_ec.add_trace(go.Scatter(
-                x=df_ec["exit_date"], y=df_ec["cum_pnl"],
-                mode="lines+markers", fill="tozeroy",
-                fillcolor="rgba(22,163,74,0.1)", line=dict(color="#16a34a"),
-                name="Cumulative P&L",
-            ))
+            fig_ec.add_trace(
+                go.Scatter(
+                    x=df_ec["exit_date"],
+                    y=df_ec["cum_pnl"],
+                    mode="lines+markers",
+                    fill="tozeroy",
+                    fillcolor="rgba(22,163,74,0.1)",
+                    line=dict(color="#16a34a"),
+                    name="Cumulative P&L",
+                )
+            )
             fig_ec.add_hline(y=0, line_dash="dash", line_color="gray")
-            fig_ec.update_layout(height=350, yaxis_title="Cumulative P&L (₹)", showlegend=False)
+            fig_ec.update_layout(
+                height=350, yaxis_title="Cumulative P&L (₹)", showlegend=False
+            )
             st.plotly_chart(fig_ec, use_container_width=True)
         else:
             st.caption("No closed trades yet.")
@@ -537,10 +628,14 @@ with tabs[2]:
                 continue
             d = pd.DataFrame(h).sort_values("exit_date")
             d["cum_pnl"] = d["realised_pnl"].cumsum()
-            fig_ov.add_trace(go.Scatter(
-                x=d["exit_date"], y=d["cum_pnl"],
-                mode="lines+markers", name=p.name,
-            ))
+            fig_ov.add_trace(
+                go.Scatter(
+                    x=d["exit_date"],
+                    y=d["cum_pnl"],
+                    mode="lines+markers",
+                    name=p.name,
+                )
+            )
         fig_ov.add_hline(y=0, line_dash="dash", line_color="gray")
         fig_ov.update_layout(height=350, yaxis_title="Cumulative P&L (₹)")
         st.plotly_chart(fig_ov, use_container_width=True)
@@ -549,17 +644,42 @@ with tabs[2]:
     st.subheader("Trade History")
     if hist:
         d = pd.DataFrame(hist)
-        sym_filter = st.text_input("Filter by symbol (substring)", "", key="port_sym_filter")
+        sym_filter = st.text_input(
+            "Filter by symbol (substring)", "", key="port_sym_filter"
+        )
         if sym_filter:
             d = d[d["symbol"].str.contains(sym_filter.upper())]
         d["pnl_color"] = d["realised_pnl"].apply(lambda x: "🟢" if x > 0 else "🔴")
-        d_display = d[["symbol", "side", "entry_price", "entry_date", "exit_price",
-                       "exit_date", "shares", "realised_pnl", "realised_pnl_pct",
-                       "exit_reason"]].copy()
-        d_display.columns = ["Symbol", "Side", "Entry ₹", "Entry Date", "Exit ₹",
-                              "Exit Date", "Shares", "P&L ₹", "P&L %", "Exit Reason"]
+        d_display = d[
+            [
+                "symbol",
+                "side",
+                "entry_price",
+                "entry_date",
+                "exit_price",
+                "exit_date",
+                "shares",
+                "realised_pnl",
+                "realised_pnl_pct",
+                "exit_reason",
+            ]
+        ].copy()
+        d_display.columns = [
+            "Symbol",
+            "Side",
+            "Entry ₹",
+            "Entry Date",
+            "Exit ₹",
+            "Exit Date",
+            "Shares",
+            "P&L ₹",
+            "P&L %",
+            "Exit Reason",
+        ]
         st.dataframe(
-            d_display, use_container_width=True, hide_index=True,
+            d_display,
+            use_container_width=True,
+            hide_index=True,
             column_config={
                 "P&L %": st.column_config.NumberColumn(format="%.2f%%"),
             },
@@ -573,7 +693,9 @@ with tabs[2]:
     sym = c5.text_input("Symbol", "RELIANCE", key="ptc_sym")
     side = c6.selectbox("Side", ["BUY", "SELL"], key="ptc_side")
     shares_inp = c7.number_input("Shares", min_value=1, value=10, step=1, key="ptc_qty")
-    price = c8.number_input("Price (₹)", min_value=0.01, value=100.0, step=0.5, key="ptc_price")
+    price = c8.number_input(
+        "Price (₹)", min_value=0.01, value=100.0, step=0.5, key="ptc_price"
+    )
     if c9.button("Execute", type="primary"):
         try:
             if side == "BUY":
@@ -585,7 +707,9 @@ with tabs[2]:
             else:
                 result = trader.sell(sym.upper(), float(price), int(shares_inp))
                 pnl = result["realised_pnl"]
-                st.success(f"✅ Sold {result['shares_closed']} × {sym.upper()} @ ₹{price:.2f} | P&L: ₹{pnl:+,.2f}")
+                st.success(
+                    f"✅ Sold {result['shares_closed']} × {sym.upper()} @ ₹{price:.2f} | P&L: ₹{pnl:+,.2f}"
+                )
             st.rerun()
         except ValueError as e:
             st.error(f"⚠️ {e}")
@@ -593,13 +717,28 @@ with tabs[2]:
     # ── Admin: Reset portfolio ───────────────────────────────────────────
     st.divider()
     with st.expander("⚠️ Danger Zone", expanded=False):
-        st.warning("Resetting a portfolio deletes ALL trades and resets cash to initial capital.")
-        confirm_reset = st.checkbox("I understand — reset all trades for this portfolio", key="reset_confirm")
-        if st.button("Reset Portfolio", type="secondary", disabled=not confirm_reset, key="reset_btn"):
+        st.warning(
+            "Resetting a portfolio deletes ALL trades and resets cash to initial capital."
+        )
+        confirm_reset = st.checkbox(
+            "I understand — reset all trades for this portfolio", key="reset_confirm"
+        )
+        if st.button(
+            "Reset Portfolio",
+            type="secondary",
+            disabled=not confirm_reset,
+            key="reset_btn",
+        ):
             with SessionLocal() as db:
-                port_obj = db.query(MockPortfolio).filter(MockPortfolio.name == selected).first()
+                port_obj = (
+                    db.query(MockPortfolio)
+                    .filter(MockPortfolio.name == selected)
+                    .first()
+                )
                 if port_obj:
-                    db.query(PaperTrade).filter(PaperTrade.portfolio_id == port_obj.id).delete()
+                    db.query(PaperTrade).filter(
+                        PaperTrade.portfolio_id == port_obj.id
+                    ).delete()
                     db.commit()
             st.success(f"Portfolio '{selected}' has been reset.")
             st.rerun()
@@ -610,9 +749,12 @@ with tabs[2]:
     try:
         from plutus.db.models import Alert as AlertModel
         from datetime import timedelta
+
         cutoff = datetime.utcnow() - timedelta(days=7)
         with SessionLocal() as db:
-            port_obj = db.query(MockPortfolio).filter(MockPortfolio.name == selected).first()
+            port_obj = (
+                db.query(MockPortfolio).filter(MockPortfolio.name == selected).first()
+            )
             if port_obj:
                 recent_alerts = (
                     db.query(AlertModel)
@@ -627,11 +769,20 @@ with tabs[2]:
                 if recent_alerts:
                     st.caption(f"{len(recent_alerts)} alerts in the last 7 days")
                     for a in recent_alerts:
-                        icon = {"PRE_SL_WARNING": "⚠️", "TARGET1_HIT": "🎯",
-                                "TARGET2_HIT": "🎯🎯", "TREND_INVALIDATED": "📉"}.get(
-                            a.alert_type.value if a.alert_type else "", "🔔")
-                        ts = a.triggered_at.strftime("%d %b %H:%M") if a.triggered_at else "?"
-                        st.caption(f"{icon} `{ts}` **{a.symbol}** — {a.alert_type.value} @ ₹{a.ltp_at_trigger or '?'}")
+                        icon = {
+                            "PRE_SL_WARNING": "⚠️",
+                            "TARGET1_HIT": "🎯",
+                            "TARGET2_HIT": "🎯🎯",
+                            "TREND_INVALIDATED": "📉",
+                        }.get(a.alert_type.value if a.alert_type else "", "🔔")
+                        ts = (
+                            a.triggered_at.strftime("%d %b %H:%M")
+                            if a.triggered_at
+                            else "?"
+                        )
+                        st.caption(
+                            f"{icon} `{ts}` **{a.symbol}** — {a.alert_type.value} @ ₹{a.ltp_at_trigger or '?'}"
+                        )
                 else:
                     st.caption("No alerts in the last 7 days.")
     except Exception:
@@ -660,21 +811,34 @@ with tabs[3]:
             seen.add(r.bundle_name)
             dedup.append(r)
 
-        df = pd.DataFrame([{
-            "Bundle": r.bundle_name,
-            "Win Rate": f"{r.win_rate:.1%}",
-            "Avg Return": f"{r.avg_return_pct:.2f}%",
-            "Max DD": f"{r.max_drawdown_pct:.2f}%",
-            "Sharpe": round(r.sharpe_ratio, 3),
-            "Trades": r.total_trades,
-            "Weight": f"{r.weight_assigned:.1%}" if r.weight_assigned is not None else "—",
-        } for r in dedup if r.bundle_name in BUNDLES])
+        df = pd.DataFrame(
+            [
+                {
+                    "Bundle": r.bundle_name,
+                    "Win Rate": f"{r.win_rate:.1%}",
+                    "Avg Return": f"{r.avg_return_pct:.2f}%",
+                    "Max DD": f"{r.max_drawdown_pct:.2f}%",
+                    "Sharpe": round(r.sharpe_ratio, 3),
+                    "Trades": r.total_trades,
+                    "Weight": (
+                        f"{r.weight_assigned:.1%}"
+                        if r.weight_assigned is not None
+                        else "—"
+                    ),
+                }
+                for r in dedup
+                if r.bundle_name in BUNDLES
+            ]
+        )
         st.subheader("5-Bundle Comparison")
         st.dataframe(df, use_container_width=True, hide_index=True)
 
         fig = px.bar(
-            df, x="Bundle", y="Sharpe",
-            color="Sharpe", color_continuous_scale="RdYlGn",
+            df,
+            x="Bundle",
+            y="Sharpe",
+            color="Sharpe",
+            color_continuous_scale="RdYlGn",
             title="Sharpe by Bundle",
         )
         st.plotly_chart(fig, use_container_width=True)
@@ -686,20 +850,27 @@ with tabs[3]:
             if not r.equity_curve_json:
                 continue
             curve = pd.read_json(r.equity_curve_json)
-            fig2.add_trace(go.Scatter(
-                x=curve["date"], y=curve["equity"],
-                mode="lines", name=r.bundle_name,
-            ))
+            fig2.add_trace(
+                go.Scatter(
+                    x=curve["date"],
+                    y=curve["equity"],
+                    mode="lines",
+                    name=r.bundle_name,
+                )
+            )
         fig2.update_layout(height=380, yaxis_title="Equity (₹)")
         st.plotly_chart(fig2, use_container_width=True)
 
     st.subheader("Manual Backtest")
     c1, c2, c3, c4 = st.columns([2, 2, 2, 1])
     sym = c1.text_input("Symbol", "RELIANCE", key="bt_sym")
-    days = c2.number_input("Days", value=365, min_value=30, max_value=730, key="bt_days")
+    days = c2.number_input(
+        "Days", value=365, min_value=30, max_value=730, key="bt_days"
+    )
     bundle = c3.selectbox("Bundle", BUNDLES + ["all 5"], key="bt_bundle")
     if c4.button("Run", key="bt_run"):
         from plutus.backtesting.runner import run_bundle, run_all_bundles
+
         with st.spinner(f"Backtesting {sym} ({days} days)…"):
             try:
                 if bundle == "all 5":
@@ -714,7 +885,9 @@ with tabs[3]:
                     )
             except Exception as e:
                 st.error(f"Backtest failed: {str(e)[:200]}")
-                st.info("This may be due to yfinance rate limits. Try again in a few minutes or during market hours.")
+                st.info(
+                    "This may be due to yfinance rate limits. Try again in a few minutes or during market hours."
+                )
 with tabs[4]:
     st.title("📰 News Feed")
 
@@ -734,14 +907,19 @@ with tabs[4]:
     if not material:
         st.caption("No material events fired in the last 7 days.")
     else:
-        mat_df = pd.DataFrame([{
-            "Time": n.published_at.strftime("%Y-%m-%d %H:%M"),
-            "Symbol": n.symbol,
-            "Event Type": n.material_event_type or "",
-            "Sentiment": n.sentiment_label or "",
-            "Headline": n.headline,
-            "Source": n.source,
-        } for n in material])
+        mat_df = pd.DataFrame(
+            [
+                {
+                    "Time": n.published_at.strftime("%Y-%m-%d %H:%M"),
+                    "Symbol": n.symbol,
+                    "Event Type": n.material_event_type or "",
+                    "Sentiment": n.sentiment_label or "",
+                    "Headline": n.headline,
+                    "Source": n.source,
+                }
+                for n in material
+            ]
+        )
         st.dataframe(mat_df, use_container_width=True, hide_index=True)
 
     st.divider()
@@ -750,10 +928,7 @@ with tabs[4]:
     st.subheader("🗑 Rejected Headlines (last 7d)")
     sym_q = st.text_input("Search by symbol", "", key="rej_search").upper().strip()
     with SessionLocal() as db:
-        q = (
-            db.query(RejectedHeadline)
-            .filter(RejectedHeadline.rejected_at >= cutoff)
-        )
+        q = db.query(RejectedHeadline).filter(RejectedHeadline.rejected_at >= cutoff)
         if sym_q:
             q = q.filter(RejectedHeadline.symbol == sym_q)
         rejected = q.order_by(RejectedHeadline.rejected_at.desc()).limit(200).all()
@@ -795,7 +970,9 @@ with tabs[5]:
                 st.rerun()
 
     if not items:
-        st.info("Watchlist empty. Add stocks above or via Telegram: `/watch add RELIANCE`.")
+        st.info(
+            "Watchlist empty. Add stocks above or via Telegram: `/watch add RELIANCE`."
+        )
     else:
         for item in items:
             with st.expander(f"📌 {item.symbol} ({item.exchange or 'NSE'})"):
@@ -822,9 +999,7 @@ with tabs[6]:
     st.title("📋 Weekly Analysis History")
 
     with SessionLocal() as db:
-        runs = (
-            db.query(WeeklyRun).order_by(WeeklyRun.id.desc()).all()
-        )
+        runs = db.query(WeeklyRun).order_by(WeeklyRun.id.desc()).all()
     if not runs:
         st.info("No history yet.")
     else:
@@ -847,22 +1022,24 @@ with tabs[6]:
         for r in filtered:
             stats = _outcome_stats_for_run(r.id)
             wr_so_far = (
-                stats["HIT_T1"] + stats["HIT_T2"]
-            ) / max(1, stats["closed"]) * 100 if stats["closed"] else 0.0
-            rows.append({
-                "Run Date": str(r.run_date),
-                "Market": r.market_regime or "N/A",
-                "BUY": r.total_buy_signals,
-                "WATCH": r.total_watch_signals,
-                "Closed": stats["closed"],
-                "Win % so far": round(wr_so_far, 1),
-            })
+                (stats["HIT_T1"] + stats["HIT_T2"]) / max(1, stats["closed"]) * 100
+                if stats["closed"]
+                else 0.0
+            )
+            rows.append(
+                {
+                    "Run Date": str(r.run_date),
+                    "Market": r.market_regime or "N/A",
+                    "BUY": r.total_buy_signals,
+                    "WATCH": r.total_watch_signals,
+                    "Closed": stats["closed"],
+                    "Win % so far": round(wr_so_far, 1),
+                }
+            )
         st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
 
         # Drill-down per run
-        run_choice = st.selectbox(
-            "Open run", [str(r.run_date) for r in filtered]
-        )
+        run_choice = st.selectbox("Open run", [str(r.run_date) for r in filtered])
         if run_choice:
             chosen = next(r for r in filtered if str(r.run_date) == run_choice)
             _render_history_drilldown(chosen)
@@ -873,6 +1050,7 @@ with tabs[7]:
     st.subheader("Trading Parameters")
     try:
         from plutus.config_params import get_param_meta, set_param, params_version_id
+
         param_meta = get_param_meta()
 
         cols = st.columns(2)
@@ -886,24 +1064,43 @@ with tabs[7]:
             max_v = float(meta.get("max") or 1e9)
             vtype = meta.get("value_type", "float")
             if vtype == "int":
-                return col.number_input(label, value=int(current), min_value=int(min_v), max_value=int(max_v), step=1, key=f"tp_{key}")
-            return col.number_input(label, value=float(current), min_value=min_v, max_value=max_v, step=0.5, format="%.1f", key=f"tp_{key}")
+                return col.number_input(
+                    label,
+                    value=int(current),
+                    min_value=int(min_v),
+                    max_value=int(max_v),
+                    step=1,
+                    key=f"tp_{key}",
+                )
+            return col.number_input(
+                label,
+                value=float(current),
+                min_value=min_v,
+                max_value=max_v,
+                step=0.5,
+                format="%.1f",
+                key=f"tp_{key}",
+            )
 
-        inputs["initial_capital"]           = _num_input("initial_capital",           cols[0])
-        inputs["max_risk_pct_per_trade"]    = _num_input("max_risk_pct_per_trade",    cols[1])
-        inputs["min_rr_ratio"]              = _num_input("min_rr_ratio",              cols[0])
-        inputs["max_open_positions"]        = _num_input("max_open_positions",        cols[1])
-        inputs["hold_days_min"]             = _num_input("hold_days_min",             cols[0])
-        inputs["hold_days_max"]             = _num_input("hold_days_max",             cols[1])
-        inputs["max_pct_capital_per_trade"] = _num_input("max_pct_capital_per_trade", cols[0])
+        inputs["initial_capital"] = _num_input("initial_capital", cols[0])
+        inputs["max_risk_pct_per_trade"] = _num_input("max_risk_pct_per_trade", cols[1])
+        inputs["min_rr_ratio"] = _num_input("min_rr_ratio", cols[0])
+        inputs["max_open_positions"] = _num_input("max_open_positions", cols[1])
+        inputs["hold_days_min"] = _num_input("hold_days_min", cols[0])
+        inputs["hold_days_max"] = _num_input("hold_days_max", cols[1])
+        inputs["max_pct_capital_per_trade"] = _num_input(
+            "max_pct_capital_per_trade", cols[0]
+        )
 
         st.divider()
         st.caption("Score thresholds (must satisfy: buy > watch > avoid)")
-        inputs["buy_threshold"]   = _num_input("buy_threshold",   cols[0])
+        inputs["buy_threshold"] = _num_input("buy_threshold", cols[0])
         inputs["watch_threshold"] = _num_input("watch_threshold", cols[1])
         inputs["avoid_threshold"] = _num_input("avoid_threshold", cols[0])
 
-        save_btn = st.button("💾 Save Parameters", type="primary", key="save_params_btn")
+        save_btn = st.button(
+            "💾 Save Parameters", type="primary", key="save_params_btn"
+        )
 
         if save_btn:
             errors = []
@@ -922,7 +1119,9 @@ with tabs[7]:
                         set_param(key, val, updated_by="dashboard")
                     new_ver = params_version_id()
                     st.success(f"Parameters saved. Params version: `{new_ver}`")
-                    st.info("Re-run the weekly pipeline to apply new parameters to recommendations.")
+                    st.info(
+                        "Re-run the weekly pipeline to apply new parameters to recommendations."
+                    )
                 except Exception as exc:
                     st.error(f"Save failed: {exc}")
 
@@ -933,11 +1132,13 @@ with tabs[7]:
     except Exception as exc:
         st.warning(f"Could not load editable parameters: {exc}")
         st.subheader("Trading Parameters (read-only fallback)")
-        st.json({
-            "initial_capital": settings.INITIAL_CAPITAL,
-            "max_risk_pct": settings.MAX_RISK_PCT,
-            "min_rr_ratio": settings.MIN_RR_RATIO,
-        })
+        st.json(
+            {
+                "initial_capital": settings.INITIAL_CAPITAL,
+                "max_risk_pct": settings.MAX_RISK_PCT,
+                "min_rr_ratio": settings.MIN_RR_RATIO,
+            }
+        )
 
     # ── Tuning Suggestions ───────────────────────────────────────────────────
     st.divider()
@@ -945,6 +1146,7 @@ with tabs[7]:
     try:
         with SessionLocal() as db:
             from plutus.db.models import TuningSuggestion
+
             suggestions = (
                 db.query(TuningSuggestion)
                 .filter(TuningSuggestion.status == "pending")
@@ -956,11 +1158,14 @@ with tabs[7]:
             st.caption("No pending tuning suggestions.")
         else:
             for s in suggestions:
-                with st.expander(f"[{s.dimension}] {s.dimension_value} — {s.current_win_rate:.0%} win rate (n={s.n_trades})"):
+                with st.expander(
+                    f"[{s.dimension}] {s.dimension_value} — {s.current_win_rate:.0%} win rate (n={s.n_trades})"
+                ):
                     st.write(s.suggestion_text)
                     c1, c2, c3 = st.columns(3)
                     if c1.button("✅ Apply", key=f"sug_apply_{s.id}"):
                         from plutus.weekly.tuner import apply_suggestion
+
                         with SessionLocal() as db2:
                             ok = apply_suggestion(s.id, db_session=db2)
                         st.success("Applied." if ok else "Already applied.")
@@ -1011,6 +1216,6 @@ with tabs[7]:
     st.code(
         f"POST {API_BASE}/analyze\n"
         "Header: X-API-Key: ***\n"
-        "Body:   {\"symbol\": \"RELIANCE\", \"exchange\": \"NSE\"}\n"
+        'Body:   {"symbol": "RELIANCE", "exchange": "NSE"}\n'
         "Notes:  30 calls/hour per key, 5-minute symbol cache (cache_hit in response)."
     )

@@ -1,0 +1,37 @@
+{
+  "_doc": "Broker grid reference values for CostModel tests. Computed from Settings defaults: brokerage=min(20, notional*0.0003), stt=notional*0.001 (both legs, delivery), exchange=notional*0.0000345, gst=(brokerage+exchange)*0.18, stamp_duty=notional*0.00003 (buy-side only). Values quantized to 4dp.",
+  "buy": [
+    {
+      "qty": 100,
+      "price": "1000",
+      "brokerage": "20.0000",
+      "stt": "100.0000",
+      "exchange": "3.4500",
+      "gst": "4.2210",
+      "stamp_duty": "3.0000",
+      "total": "130.6710"
+    },
+    {
+      "qty": 10,
+      "price": "100",
+      "brokerage": "0.3000",
+      "stt": "1.0000",
+      "exchange": "0.0345",
+      "gst": "0.0602",
+      "stamp_duty": "0.0300",
+      "total": "1.4247"
+    }
+  ],
+  "sell": [
+    {
+      "qty": 100,
+      "price": "1000",
+      "brokerage": "20.0000",
+      "stt": "100.0000",
+      "exchange": "3.4500",
+      "gst": "4.2210",
+      "stamp_duty": "0.0000",
+      "total": "127.6710"
+    }
+  ]
+}

@@ -20,7 +20,11 @@ from plutus.api.routes import router as api_router
 from plutus.backtesting.runner import run_all_bundles
 from plutus.data.regime import persist_regime_snapshot
 from plutus.pipeline.checkpoint import (
-    cleanup_old_runs, load_ohlcv, new_run_id, save_ohlcv, save_stage,
+    cleanup_old_runs,
+    load_ohlcv,
+    new_run_id,
+    save_ohlcv,
+    save_stage,
 )
 from plutus.config import settings
 from plutus.data.news import classify_news, fetch_news
@@ -55,6 +59,7 @@ async def healthz() -> dict:
 
 # ── Helper: push to plutus-bot over loopback ────────────────────────────────
 
+
 async def _push_to_bot(path: str, payload: dict) -> bool:
     """POST to plutus-bot's loopback /push endpoint. Never raises."""
     url = f"http://{settings.BOT_INTERNAL_HOST}:{settings.BOT_INTERNAL_PORT}{path}"
@@ -69,6 +74,7 @@ async def _push_to_bot(path: str, payload: dict) -> bool:
 
 
 # ── Job 1: weekly_pipeline (Sun 18:00 IST) ──────────────────────────────────
+
 
 async def weekly_pipeline() -> None:
     """
@@ -140,12 +146,15 @@ async def weekly_pipeline() -> None:
 
     # Checkpoint analyses
     save_stage(pipeline_run_id, "analyses", {sym: res for sym, res in analyses})
-    logger.info("analyses_checkpoint_saved", run_id=pipeline_run_id, count=len(analyses))
+    logger.info(
+        "analyses_checkpoint_saved", run_id=pipeline_run_id, count=len(analyses)
+    )
 
     # 5. DB writes — one weekly_runs + one recommendations row per BUY/WATCH
     # Fetch live regime for WeeklyRun metadata
     try:
         from plutus.data.regime import get_nifty_regime
+
         _regime_meta = await asyncio.to_thread(get_nifty_regime)
         _regime_trend = _regime_meta.get("trend", "UNKNOWN")
     except Exception:
@@ -230,7 +239,9 @@ async def weekly_pipeline() -> None:
     )
 
 
-def _write_weekly_report(run_date: date, analyses: list[tuple[str, dict]], path: str) -> None:
+def _write_weekly_report(
+    run_date: date, analyses: list[tuple[str, dict]], path: str
+) -> None:
     Path(os.path.dirname(path)).mkdir(parents=True, exist_ok=True)
     buys = [(s, r) for s, r in analyses if r.get("recommendation") == "BUY"]
     watches = [(s, r) for s, r in analyses if r.get("recommendation") == "WATCH"]
@@ -271,6 +282,7 @@ def _write_weekly_report(run_date: date, analyses: list[tuple[str, dict]], path:
 
 # ── Job 2: weekly_revalidate (Mon 09:10 IST) ────────────────────────────────
 
+
 async def weekly_revalidate() -> None:
     """
     Monday-open gap re-validation. NO LLM CALLS. Pure price math.
@@ -285,9 +297,7 @@ async def weekly_revalidate() -> None:
 
     downgraded: list[tuple[str, str, str, float]] = []  # (sym, from, to, ltp)
     with SessionLocal() as db:
-        latest = (
-            db.query(WeeklyRun).order_by(WeeklyRun.run_date.desc()).first()
-        )
+        latest = db.query(WeeklyRun).order_by(WeeklyRun.run_date.desc()).first()
         if latest is None:
             logger.info("weekly_revalidate_no_run")
             return
@@ -306,7 +316,9 @@ async def weekly_revalidate() -> None:
             try:
                 ltp = await asyncio.to_thread(fetch_live_price, rec.symbol)
             except Exception as e:
-                logger.warning("revalidate_price_failed", symbol=rec.symbol, error=str(e))
+                logger.warning(
+                    "revalidate_price_failed", symbol=rec.symbol, error=str(e)
+                )
                 continue
 
             new_verdict = rec.recommendation
@@ -346,6 +358,7 @@ async def weekly_revalidate() -> None:
 
 # ── Job 3: news_monitor (Mon-Fri hourly, 09:00–15:59 IST) ───────────────────
 
+
 async def news_monitor() -> None:
     """
     Hourly news scan during market hours.
@@ -367,7 +380,9 @@ async def news_monitor() -> None:
         watch_syms = {w.symbol for w in db.query(Watchlist).all()}
         open_syms = {
             t.symbol
-            for t in db.query(PaperTrade).filter(PaperTrade.status == TradeStatus.OPEN).all()
+            for t in db.query(PaperTrade)
+            .filter(PaperTrade.status == TradeStatus.OPEN)
+            .all()
         }
     symbols = sorted(watch_syms | open_syms)
     if not symbols:
@@ -424,7 +439,9 @@ async def news_monitor() -> None:
         except Exception as e:
             logger.error("news_monitor_symbol_failed", symbol=sym, error=str(e))
 
-    logger.info("news_monitor_done", symbols=len(symbols), classified=checked, alerted=alerted)
+    logger.info(
+        "news_monitor_done", symbols=len(symbols), classified=checked, alerted=alerted
+    )
 
 
 # ── Job 4: outcome_tracker (Mon-Fri 16:30 IST) ──────────────────────────────
@@ -435,6 +452,7 @@ async def news_monitor() -> None:
 
 
 # ── Job 5: cleanup_rejected_headlines (Daily 03:00 IST) ─────────────────────
+
 
 async def cleanup_rejected_headlines() -> None:
     """
@@ -457,6 +475,7 @@ async def cleanup_rejected_headlines() -> None:
 
 # ── Scheduler wiring ────────────────────────────────────────────────────────
 
+
 def build_scheduler() -> AsyncIOScheduler:
     sched = AsyncIOScheduler(timezone=IST)
 
@@ -464,9 +483,9 @@ def build_scheduler() -> AsyncIOScheduler:
     sched.add_job(
         weekly_pipeline,
         CronTrigger(
-            day_of_week=settings.WEEKLY_RUN_DAY,           # "sun"
-            hour=settings.WEEKLY_RUN_HOUR,                 # 18
-            minute=settings.WEEKLY_RUN_MINUTE,             # 0
+            day_of_week=settings.WEEKLY_RUN_DAY,  # "sun"
+            hour=settings.WEEKLY_RUN_HOUR,  # 18
+            minute=settings.WEEKLY_RUN_MINUTE,  # 0
             timezone=IST,
         ),
         id="weekly_pipeline",
@@ -558,6 +577,7 @@ def build_scheduler() -> AsyncIOScheduler:
 
 
 # ── Entry point ─────────────────────────────────────────────────────────────
+
 
 async def _serve() -> None:
     sched = build_scheduler()

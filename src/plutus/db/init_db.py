@@ -1,11 +1,8 @@
-from plutus.db.session import Base, engine
-from plutus.db import models  # noqa: F401 — import all models so they register with Base
+from __future__ import annotations
+
+from plutus.db.models import Base
+from plutus.db.session import get_engine
 
 
-def init():
-    Base.metadata.create_all(bind=engine)
-    print("All tables created.")
-
-
-if __name__ == "__main__":
-    init()
+def init_db() -> None:
+    Base.metadata.create_all(get_engine())

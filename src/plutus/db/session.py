@@ -1,31 +1,50 @@
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, DeclarativeBase
+from __future__ import annotations
 
-from plutus.config import settings
+from collections.abc import Iterator
+from contextlib import contextmanager
 
-# Use different engine parameters for SQLite vs PostgreSQL
-if settings.DATABASE_URL.startswith("sqlite"):
-    engine = create_engine(settings.DATABASE_URL)
-else:
-    engine = create_engine(
-        settings.DATABASE_URL,
-        pool_size=5,
-        max_overflow=10,
-        pool_pre_ping=True,
-    )
+from sqlalchemy import Engine, create_engine
+from sqlalchemy.orm import Session, sessionmaker
 
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+from plutus.config.settings import get_settings
+
+_engine: Engine | None = None
+_SessionLocal: sessionmaker[Session] | None = None
 
 
-class Base(DeclarativeBase):
-    """Declarative base shared by every ORM model in plutus.db.models."""
-    pass
+def get_engine() -> Engine:
+    global _engine
+    if _engine is None:
+        _engine = create_engine(get_settings().db_url, future=True)
+    return _engine
 
 
-def get_db():
-    """FastAPI dependency: yields a session and closes it on request teardown."""
-    db = SessionLocal()
+def _session_factory() -> sessionmaker[Session]:
+    global _SessionLocal
+    if _SessionLocal is None:
+        _SessionLocal = sessionmaker(
+            autocommit=False, autoflush=False, bind=get_engine(), future=True
+        )
+    return _SessionLocal
+
+
+@contextmanager
+def session_scope() -> Iterator[Session]:
+    s = _session_factory()()
     try:
-        yield db
+        yield s
+        s.commit()
+    except Exception:
+        s.rollback()
+        raise
     finally:
-        db.close()
+        s.close()
+
+
+def reset_engine_for_tests(url: str) -> None:
+    """Test-only: rebind the engine to an isolated DB URL."""
+    global _engine, _SessionLocal
+    _engine = create_engine(url, future=True)
+    _SessionLocal = sessionmaker(
+        autocommit=False, autoflush=False, bind=_engine, future=True
+    )

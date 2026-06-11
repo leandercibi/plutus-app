@@ -72,8 +72,8 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 logger = logging.getLogger("refresh_seed_universe")
 
 # Number of trading days used for the longer-horizon momentum / RS window.
-_MOM_LONG = 126   # ~6 months
-_MOM_SHORT = 63   # ~3 months
+_MOM_LONG = 126  # ~6 months
+_MOM_SHORT = 63  # ~3 months
 
 
 def _load_candidate_pool(seed_csv: Path, extra_csv: Path | None) -> List[str]:
@@ -132,11 +132,21 @@ def _compute_metrics(symbol: str, df: pd.DataFrame) -> Dict | None:
 
     # Trend stack + EMA50 slope over ~1 month.
     stacked = last_close > ema50.iloc[-1] > ema200.iloc[-1]
-    ema50_slope = (ema50.iloc[-1] - ema50.iloc[-21]) / ema50.iloc[-21] if len(ema50) > 21 else 0.0
+    ema50_slope = (
+        (ema50.iloc[-1] - ema50.iloc[-21]) / ema50.iloc[-21] if len(ema50) > 21 else 0.0
+    )
 
     # Momentum: blend 3m and 6m simple returns.
-    ret_short = last_close / float(close.iloc[-_MOM_SHORT]) - 1 if len(close) > _MOM_SHORT else 0.0
-    ret_long = last_close / float(close.iloc[-_MOM_LONG]) - 1 if len(close) > _MOM_LONG else ret_short
+    ret_short = (
+        last_close / float(close.iloc[-_MOM_SHORT]) - 1
+        if len(close) > _MOM_SHORT
+        else 0.0
+    )
+    ret_long = (
+        last_close / float(close.iloc[-_MOM_LONG]) - 1
+        if len(close) > _MOM_LONG
+        else ret_short
+    )
     momentum = 0.5 * ret_short + 0.5 * ret_long
 
     # RSI(14) for the setup score.
@@ -144,10 +154,14 @@ def _compute_metrics(symbol: str, df: pd.DataFrame) -> Dict | None:
     gain = delta.clip(lower=0).ewm(alpha=1 / 14, adjust=False).mean()
     loss = (-delta.clip(upper=0)).ewm(alpha=1 / 14, adjust=False).mean()
     rs = gain / loss.replace(0, np.nan)
-    rsi = float((100 - 100 / (1 + rs)).iloc[-1]) if not math.isnan(rs.iloc[-1]) else 50.0
+    rsi = (
+        float((100 - 100 / (1 + rs)).iloc[-1]) if not math.isnan(rs.iloc[-1]) else 50.0
+    )
 
     # Extension above EMA20 (how stretched / how much room).
-    ext_from_ema20 = (last_close - ema20.iloc[-1]) / ema20.iloc[-1] if ema20.iloc[-1] else 0.0
+    ext_from_ema20 = (
+        (last_close - ema20.iloc[-1]) / ema20.iloc[-1] if ema20.iloc[-1] else 0.0
+    )
 
     return {
         "symbol": symbol,
@@ -195,23 +209,27 @@ def _score(rows: List[Dict]) -> pd.DataFrame:
     setup = (rsi_fit * 0.7 + (1 - ext_penalty) * 0.3).clip(lower=0)
 
     df["score"] = (
-        liquidity * 25
-        + trend * 25
-        + momentum * 25
-        + rel_strength * 15
-        + setup * 10
+        liquidity * 25 + trend * 25 + momentum * 25 + rel_strength * 15 + setup * 10
     ).round(2)
     df["segment"] = df["avg_turnover_cr"].map(_segment_for_turnover)
     return df.sort_values("score", ascending=False).reset_index(drop=True)
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="Rebuild seed_universe.csv from ranked OHLCV.")
-    ap.add_argument("--add", type=Path, default=None, help="extra candidate CSV (col: symbol)")
+    ap = argparse.ArgumentParser(
+        description="Rebuild seed_universe.csv from ranked OHLCV."
+    )
+    ap.add_argument(
+        "--add", type=Path, default=None, help="extra candidate CSV (col: symbol)"
+    )
     ap.add_argument("--top", type=int, default=500, help="keep top-N ranked symbols")
-    ap.add_argument("--report", type=Path, default=Path("plutus/data/universe_ranked.csv"))
+    ap.add_argument(
+        "--report", type=Path, default=Path("plutus/data/universe_ranked.csv")
+    )
     ap.add_argument("--min-bars", type=int, default=150)
-    ap.add_argument("--dry-run", action="store_true", help="do not overwrite seed_universe.csv")
+    ap.add_argument(
+        "--dry-run", action="store_true", help="do not overwrite seed_universe.csv"
+    )
     args = ap.parse_args()
 
     seed_csv = Path(settings.UNIVERSE_SEED_CSV)
@@ -246,14 +264,24 @@ def main() -> int:
     ranked = _score(rows)
     logger.info(
         "Passed gates: %d / %d  (fetch/short failures: %d)",
-        len(ranked), len(pool), failed,
+        len(ranked),
+        len(pool),
+        failed,
     )
 
     # Full ranked report (all metrics) — always written.
     args.report.parent.mkdir(parents=True, exist_ok=True)
     report_cols = [
-        "symbol", "score", "segment", "last_close", "avg_turnover_cr",
-        "avg_volume_30d", "ret_3m_pct", "ret_6m_pct", "rsi", "trend_stacked",
+        "symbol",
+        "score",
+        "segment",
+        "last_close",
+        "avg_turnover_cr",
+        "avg_volume_30d",
+        "ret_3m_pct",
+        "ret_6m_pct",
+        "rsi",
+        "trend_stacked",
     ]
     ranked[report_cols].to_csv(args.report, index=False)
     logger.info("Wrote ranked report -> %s", args.report)
@@ -261,7 +289,12 @@ def main() -> int:
     top = ranked.head(args.top)
     seg_counts = top["segment"].value_counts().to_dict()
     logger.info("Top %d segment mix: %s", len(top), seg_counts)
-    logger.info("Top 10 by score:\n%s", top[["symbol", "score", "segment", "ret_6m_pct"]].head(10).to_string(index=False))
+    logger.info(
+        "Top 10 by score:\n%s",
+        top[["symbol", "score", "segment", "ret_6m_pct"]]
+        .head(10)
+        .to_string(index=False),
+    )
 
     if args.dry_run:
         logger.info("--dry-run: seed_universe.csv left unchanged.")
@@ -271,7 +304,12 @@ def main() -> int:
     out = top[["symbol", "segment"]].copy()
     out.insert(1, "exchange", "NSE")
     out.to_csv(seed_csv, index=False)
-    logger.info("Wrote %d symbols -> %s (was the candidate pool of %d)", len(out), seed_csv, len(pool))
+    logger.info(
+        "Wrote %d symbols -> %s (was the candidate pool of %d)",
+        len(out),
+        seed_csv,
+        len(pool),
+    )
     logger.info("Generated %s", date.today().isoformat())
     return 0
 

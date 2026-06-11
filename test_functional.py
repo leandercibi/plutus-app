@@ -9,6 +9,7 @@ DASHBOARD_URL = "http://localhost:8501"
 SS = "/Users/leander/personal-projects/plutus-app/screenshots/functional"
 os.makedirs(SS, exist_ok=True)
 
+
 def ss(page, name):
     """Take screenshot with consistent naming."""
     path = f"{SS}/{name}.png"
@@ -16,19 +17,20 @@ def ss(page, name):
     print(f"   📸 {name}.png")
     return path
 
+
 def test():
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=False, slow_mo=300)
         page = browser.new_context(viewport={"width": 1920, "height": 1080}).new_page()
-        
+
         print("🧪 FULL FUNCTIONAL TEST - Every Feature")
         print("=" * 70)
-        
+
         # Load
         page.goto(DASHBOARD_URL, wait_until="networkidle", timeout=30000)
         time.sleep(4)
         ss(page, "01_loaded")
-        
+
         # ═══════════════════════════════════════════════════════════════
         # HOME TAB
         # ═══════════════════════════════════════════════════════════════
@@ -37,7 +39,7 @@ def test():
         time.sleep(2)
         ss(page, "02_home")
         print("   ✓ Home tab loaded")
-        
+
         # ═══════════════════════════════════════════════════════════════
         # WATCHLIST TAB - Add symbols
         # ═══════════════════════════════════════════════════════════════
@@ -45,7 +47,7 @@ def test():
         page.get_by_role("tab", name="👁 Watchlist").click()
         time.sleep(2)
         ss(page, "03_watchlist_empty")
-        
+
         # Add INFY to watchlist
         print("   Adding INFY to watchlist...")
         text_inputs = page.locator("input[type='text']").all()
@@ -55,7 +57,7 @@ def test():
                 break
         time.sleep(0.5)
         ss(page, "04_watchlist_typed_infy")
-        
+
         # Click Add button
         add_btn = page.get_by_role("button", name="Add to watchlist")
         if add_btn.is_visible():
@@ -65,7 +67,7 @@ def test():
             print("   ✓ Added INFY to watchlist")
         else:
             print("   ⚠️ Add button not found")
-        
+
         # Add TCS
         print("   Adding TCS to watchlist...")
         page.get_by_role("tab", name="👁 Watchlist").click()
@@ -76,19 +78,19 @@ def test():
                 inp.fill("TCS")
                 break
         time.sleep(0.5)
-        
+
         add_btn = page.get_by_role("button", name="Add to watchlist")
         if add_btn.is_visible():
             add_btn.click()
             time.sleep(3)
             ss(page, "06_watchlist_added_tcs")
             print("   ✓ Added TCS to watchlist")
-        
+
         # Final watchlist state
         time.sleep(2)
         ss(page, "07_watchlist_final")
         print("   ✓ Watchlist with symbols")
-        
+
         # ═══════════════════════════════════════════════════════════════
         # PORTFOLIO TAB - View portfolio, test Check button
         # ═══════════════════════════════════════════════════════════════
@@ -97,12 +99,12 @@ def test():
         time.sleep(2)
         ss(page, "08_portfolio_initial")
         print("   ✓ Portfolio tab loaded")
-        
+
         # Check if portfolio selector is visible
         content = page.content()
         if "test-local" in content:
             print("   ✓ Portfolio 'test-local' visible in selector")
-        
+
         # Look for Check button and click it
         check_btns = page.get_by_role("button").all()
         for btn in check_btns:
@@ -117,7 +119,7 @@ def test():
                     break
             except:
                 pass
-        
+
         # Look for Buy section
         buy_btns = page.get_by_role("button").all()
         for btn in buy_btns:
@@ -128,9 +130,9 @@ def test():
                     break
             except:
                 pass
-        
+
         ss(page, "10_portfolio_full")
-        
+
         # ═══════════════════════════════════════════════════════════════
         # STRATEGY LAB - Run backtest
         # ═══════════════════════════════════════════════════════════════
@@ -138,7 +140,7 @@ def test():
         page.get_by_role("tab", name="🧪 Strategy Lab").click()
         time.sleep(2)
         ss(page, "11_strategy_lab_initial")
-        
+
         # Find the symbol input and enter INFY
         text_inputs = page.locator("input[type='text']").all()
         for inp in text_inputs:
@@ -149,10 +151,10 @@ def test():
                     break
             except:
                 pass
-        
+
         time.sleep(0.5)
         ss(page, "12_strategy_lab_symbol_entered")
-        
+
         # Click Run button
         run_btn = page.get_by_role("button", name="Run")
         if run_btn.is_visible():
@@ -176,7 +178,7 @@ def test():
                         break
                 except:
                     pass
-        
+
         # ═══════════════════════════════════════════════════════════════
         # SIGNALS TAB - Analyze stock
         # ═══════════════════════════════════════════════════════════════
@@ -184,7 +186,7 @@ def test():
         page.get_by_role("tab", name="📊 Signals").click()
         time.sleep(2)
         ss(page, "14_signals_initial")
-        
+
         # Find symbol input
         text_inputs = page.locator("input[type='text']").all()
         for inp in text_inputs:
@@ -195,11 +197,11 @@ def test():
                     break
             except:
                 pass
-        
+
         time.sleep(0.5)
         ss(page, "15_signals_symbol_entered")
         print("   ⚠️ Skipping Analyze click (requires OpenRouter API key + 30s wait)")
-        
+
         # ═══════════════════════════════════════════════════════════════
         # NEWS FEED TAB
         # ═══════════════════════════════════════════════════════════════
@@ -208,7 +210,7 @@ def test():
         time.sleep(2)
         ss(page, "16_news_feed")
         print("   ✓ News feed tab loaded")
-        
+
         # ═══════════════════════════════════════════════════════════════
         # HISTORY TAB
         # ═══════════════════════════════════════════════════════════════
@@ -217,7 +219,7 @@ def test():
         time.sleep(2)
         ss(page, "17_history")
         print("   ✓ History tab loaded")
-        
+
         # ═══════════════════════════════════════════════════════════════
         # SETTINGS TAB
         # ═══════════════════════════════════════════════════════════════
@@ -226,26 +228,26 @@ def test():
         time.sleep(2)
         ss(page, "18_settings")
         print("   ✓ Settings tab loaded")
-        
+
         # Check secrets are redacted
         content = page.content()
         if "***" in content:
             print("   ✓ Secrets redacted")
         if "API_PORT" in content:
             print("   ✓ Config keys visible")
-        
+
         # ═══════════════════════════════════════════════════════════════
         # FINAL SUMMARY
         # ═══════════════════════════════════════════════════════════════
         print("\n" + "=" * 70)
         print("📊 TEST RESULTS")
         print("=" * 70)
-        
-        screenshots = sorted([f for f in os.listdir(SS) if f.endswith('.png')])
+
+        screenshots = sorted([f for f in os.listdir(SS) if f.endswith(".png")])
         print(f"\n📸 {len(screenshots)} screenshots captured:")
         for s in screenshots:
             print(f"   • {s}")
-        
+
         # Check for errors
         print("\n🔍 Error check:")
         content = page.content()
@@ -256,16 +258,17 @@ def test():
             errors.append("ImportError found")
         if "NameError" in content:
             errors.append("NameError found")
-        
+
         if errors:
             print(f"   ❌ Errors: {', '.join(errors)}")
         else:
             print("   ✓ No Python errors visible in UI")
-        
+
         time.sleep(3)
         browser.close()
-        
+
         print(f"\n✅ All screenshots saved to: {SS}/")
+
 
 if __name__ == "__main__":
     test()
