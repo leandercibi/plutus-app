@@ -223,3 +223,7 @@ __marimo__/
 !.crew/graphs/
 !.crew/artifacts/.gitkeep
 !.crew/graphs/.gitkeep
+
+
+/specs
+/docs
