@@ -47,6 +47,16 @@ class Settings(BaseSettings):
     # --- exits (B8) ---
     no_progress_t1_threshold: float = 0.3
     no_progress_elapsed_threshold: float = 0.5
+    cooldown_minutes: int = 60
+    chandelier_atr_mult: float = 3.0
+    chandelier_atr_period: int = 22
+
+    # --- entries (A9, B6, B7, A15) ---
+    volume_gate_delivery_mult: float = 1.3
+    circuit_lookback_sessions: int = 90
+    breakout_strong_atr_mult: float = 2.0
+    earnings_stop_widen_atr: float = 1.0
+    monday_gap_kill_atr_mult: float = 1.0
 
     # --- regime ---
     breadth_window_short: int = 50
