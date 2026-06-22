@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import threading
+import time
 import uuid
 from datetime import date
 from typing import Any, cast
@@ -199,6 +201,34 @@ def _df_to_bars(df: "pd.DataFrame", is_intraday: bool = False) -> "list[ChartBar
     return bars
 
 
+class _TTLCache:
+    """Thread-safe in-process cache with per-entry TTL."""
+
+    def __init__(self) -> None:
+        self._store: dict[str, tuple[Any, float]] = {}
+        self._lock = threading.Lock()
+
+    def get(self, key: str) -> Any | None:
+        with self._lock:
+            entry = self._store.get(key)
+            if entry is None:
+                return None
+            value, expires_at = entry
+            if time.monotonic() > expires_at:
+                del self._store[key]
+                return None
+            return value
+
+    def set(self, key: str, value: Any, ttl: int) -> None:
+        with self._lock:
+            self._store[key] = (value, time.monotonic() + ttl)
+
+
+_chart_cache = _TTLCache()
+_DAILY_TTL = 4 * 3600   # daily bars: 4 hours
+_INTRADAY_TTL = 3600    # intraday bars: 1 hour
+
+
 @router.get("/chart/{symbol}", response_model=ChartDataOut)
 def get_chart(
     symbol: str,
@@ -213,32 +243,35 @@ def get_chart(
     from plutus.config.settings import get_settings
     from plutus.data.providers.yfinance_provider import YFinanceProvider
 
-    # --- Daily bars (Angel One preferred; yfinance fallback) ---
+    # --- Daily bars (Angel One preferred; yfinance fallback; 4h cache) ---
     end = date.today()
     fetch_days = max(days + 60, 300)
     start = end - timedelta(days=fetch_days)
     settings = get_settings()
-    df = None
-    if all([settings.angel_api_key, settings.angel_client_id,
-            settings.angel_password, settings.angel_totp_secret]):
-        try:
-            from plutus.data.providers.angelone_provider import AngelOneProvider
-            angel = AngelOneProvider(
-                api_key=settings.angel_api_key,
-                client_id=settings.angel_client_id,
-                password=settings.angel_password,
-                totp_secret=settings.angel_totp_secret,
-            )
-            df = angel.fetch(symbol, start, end)
-        except Exception:
-            df = None
-    if df is None or df.empty:
-        try:
-            df = YFinanceProvider().fetch(symbol, start, end)
-        except Exception as exc:
-            raise HTTPException(status_code=404, detail=f"No chart data for {symbol}") from exc
-    if df is None or df.empty:
-        raise HTTPException(status_code=404, detail=f"No chart data for {symbol}")
+    daily_key = f"daily:{symbol}"
+    df = _chart_cache.get(daily_key)
+    if df is None:
+        if all([settings.angel_api_key, settings.angel_client_id,
+                settings.angel_password, settings.angel_totp_secret]):
+            try:
+                from plutus.data.providers.angelone_provider import AngelOneProvider
+                angel = AngelOneProvider(
+                    api_key=settings.angel_api_key,
+                    client_id=settings.angel_client_id,
+                    password=settings.angel_password,
+                    totp_secret=settings.angel_totp_secret,
+                )
+                df = angel.fetch(symbol, start, end)
+            except Exception:
+                df = None
+        if df is None or df.empty:
+            try:
+                df = YFinanceProvider().fetch(symbol, start, end)
+            except Exception as exc:
+                raise HTTPException(status_code=404, detail=f"No chart data for {symbol}") from exc
+        if df is None or df.empty:
+            raise HTTPException(status_code=404, detail=f"No chart data for {symbol}")
+        _chart_cache.set(daily_key, df, _DAILY_TTL)
     df = _add_indicators(df)
 
     # latest price uses full history (not display slice) for accuracy
@@ -250,8 +283,8 @@ def get_chart(
     display_df = df.iloc[-days:]
     bars = _df_to_bars(display_df, is_intraday=False)
 
-    # --- Intraday bars (Angel One ONE_HOUR, 60 days) ---
-    # Fetched once and cached on the client; duration switches are client-side slices.
+    # --- Intraday bars (Angel One ONE_HOUR, 60 days; 1h cache) ---
+    # Fetched once; duration switches (3d/1w) are client-side slices.
     intraday_bars: list[ChartBarOut] = []
     if all([
         settings.angel_api_key,
@@ -259,20 +292,24 @@ def get_chart(
         settings.angel_password,
         settings.angel_totp_secret,
     ]):
-        try:
-            from plutus.data.providers.angelone_provider import AngelOneProvider
-            angel = AngelOneProvider(
-                api_key=settings.angel_api_key,
-                client_id=settings.angel_client_id,
-                password=settings.angel_password,
-                totp_secret=settings.angel_totp_secret,
-            )
-            idf = angel.fetch_intraday(symbol, days=60, interval="ONE_HOUR")
-            if not idf.empty:
-                idf = _add_indicators(idf)
-                intraday_bars = _df_to_bars(idf, is_intraday=True)
-        except Exception:
-            pass  # graceful fallback: intraday_bars stays empty
+        intraday_key = f"intraday:{symbol}"
+        intraday_bars = _chart_cache.get(intraday_key) or []
+        if not intraday_bars:
+            try:
+                from plutus.data.providers.angelone_provider import AngelOneProvider
+                angel = AngelOneProvider(
+                    api_key=settings.angel_api_key,
+                    client_id=settings.angel_client_id,
+                    password=settings.angel_password,
+                    totp_secret=settings.angel_totp_secret,
+                )
+                idf = angel.fetch_intraday(symbol, days=60, interval="ONE_HOUR")
+                if not idf.empty:
+                    idf = _add_indicators(idf)
+                    intraday_bars = _df_to_bars(idf, is_intraday=True)
+                    _chart_cache.set(intraday_key, intraday_bars, _INTRADAY_TTL)
+            except Exception:
+                pass  # graceful fallback: intraday_bars stays empty
 
     marker: ChartSignalMarker | None = None
     if signal_id is not None:
