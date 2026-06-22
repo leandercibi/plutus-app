@@ -1,164 +1,95 @@
 #!/bin/bash
-# Local testing script for Plutus on macOS
-# Run this to start all services locally
-
+# Local testing script for Plutus v2 on macOS — starts API + dashboard locally.
 set -e
 
 PROJECT_ROOT="/Users/leander/personal-projects/plutus-app"
 cd "$PROJECT_ROOT"
 
-echo "=== Plutus Local Test Environment ==="
+API_PORT=8009
+DASH_PORT=8501
+
+echo "=== Plutus v2 Local Test Environment ==="
 echo ""
 
-# Check prerequisites
-echo "1. Checking prerequisites..."
-if ! command -v psql &> /dev/null; then
-    echo "❌ PostgreSQL not found. Install with: brew install postgresql@16"
+# 1. Python environment (repo-root venv)
+echo "1. Checking Python environment..."
+if [ ! -d ".venv" ]; then
+    echo "❌ Virtual environment not found at .venv"
+    echo "   Create it: python3.11 -m venv .venv && .venv/bin/pip install -e ."
     exit 1
 fi
 
-# Restart database
-echo "Restarting PostgreSQL..."
-brew services restart postgresql@16
-sleep 3
-echo "✓ PostgreSQL restarted"
-
-# Replay all migrations
-echo "Applying migrations..."
-for f in "$PROJECT_ROOT"/migrations/*.sql; do
-    PGPASSWORD=plutus psql -h 127.0.0.1 -U plutus -d plutus_db -f "$f" > /dev/null 2>&1
-done
-echo "✓ Migrations applied"
-
-# Check if database exists
-if ! PGPASSWORD=plutus psql -h 127.0.0.1 -U plutus -d plutus_db -c "SELECT 1" &> /dev/null; then
-    echo "❌ Database 'plutus_db' not accessible. Run Phase 2 setup first."
+if ! .venv/bin/python -c "from plutus.config.settings import get_settings; get_settings()" 2>&1; then
+    echo "❌ Settings failed to load. Check your .env (or run with dev defaults)."
     exit 1
 fi
-
-echo "✓ PostgreSQL running"
-echo "✓ Database 'plutus_db' accessible"
+echo "✓ venv ready, settings load"
 echo ""
 
-# Check Python environment
-echo "2. Checking Python environment..."
-if [ ! -d "src/.venv" ]; then
-    echo "❌ Virtual environment not found at src/.venv"
-    exit 1
-fi
-
-cd src
-if ! .venv/bin/python -c "from plutus.config import settings; print('✓ Config loads')" 2>&1 | grep -q "Config loads"; then
-    echo "❌ Config validation failed. Check src/.env file"
-    exit 1
-fi
-cd ..
-
-echo "✓ Python 3.11 venv ready"
-echo "✓ Config loads successfully"
+# Dev uses sqlite by default (Settings.db_url) — no Postgres required locally.
+echo "2. Initializing database (sqlite dev default unless DB_URL overrides)..."
+.venv/bin/python -m plutus.db.init_db && echo "✓ schema ready"
 echo ""
 
-# Check if ports are available
+# 3. Port checks
 echo "3. Checking ports..."
-if lsof -Pi :8009 -sTCP:LISTEN -t >/dev/null 2>&1; then
-    echo "⚠️  Port 8009 already in use (FastAPI)"
-    lsof -Pi :8009 -sTCP:LISTEN
-fi
-
-if lsof -Pi :8501 -sTCP:LISTEN -t >/dev/null 2>&1; then
-    echo "⚠️  Port 8501 already in use (Streamlit)"
-    lsof -Pi :8501 -sTCP:LISTEN
-fi
-
-if lsof -Pi :8002 -sTCP:LISTEN -t >/dev/null 2>&1; then
-    echo "⚠️  Port 8002 already in use (Telegram bot)"
-    lsof -Pi :8002 -sTCP:LISTEN
-fi
-
+for port in $API_PORT $DASH_PORT; do
+    if lsof -Pi :$port -sTCP:LISTEN -t >/dev/null 2>&1; then
+        echo "⚠️  Port $port already in use"
+        lsof -Pi :$port -sTCP:LISTEN
+    fi
+done
 echo ""
+
 echo "=== Starting Services ==="
-echo ""
-
-# Create logs directory
 mkdir -p logs
 
-# Start FastAPI + Scheduler (main.py)
-echo "Starting plutus-main (FastAPI + Scheduler) on port 8009..."
-cd src
-.venv/bin/python -c "
-import sys
-sys.path.insert(0, '.')
-# Don't actually start - just verify imports
-from plutus.api.routes import router
-from plutus.agents.graph import run_analysis
-print('✓ All imports successful')
-" 2>&1
+# Smoke-check imports before launching.
+.venv/bin/python -c "from plutus.api.main import app; print('✓ FastAPI app imports')"
 
-# Start in background
-PYTHONPATH=. .venv/bin/python ../main.py > ../logs/main.log 2>&1 &
-MAIN_PID=$!
-echo "  PID: $MAIN_PID (logs: logs/main.log)"
-cd ..
-
+# FastAPI (uvicorn)
+echo "Starting plutus-api (uvicorn) on port $API_PORT..."
+.venv/bin/uvicorn plutus.api.main:app --host 127.0.0.1 --port $API_PORT > logs/api.log 2>&1 &
+API_PID=$!
+echo "  PID: $API_PID (logs: logs/api.log)"
 sleep 3
 
-# Check if main started successfully
-if ! curl -s http://localhost:8009/healthz > /dev/null 2>&1; then
-    echo "❌ FastAPI failed to start. Check logs/main.log"
-    kill $MAIN_PID 2>/dev/null || true
+if ! curl -s "http://localhost:$API_PORT/healthz" > /dev/null 2>&1; then
+    echo "❌ FastAPI failed to start. Check logs/api.log"
+    kill $API_PID 2>/dev/null || true
     exit 1
 fi
-echo "✓ FastAPI running at http://localhost:8009"
+echo "✓ FastAPI running at http://localhost:$API_PORT"
 
-# Start Streamlit Dashboard
+# Streamlit dashboard
 echo ""
-echo "Starting plutus-dashboard (Streamlit) on port 8501..."
-cd src
-.venv/bin/streamlit run dashboard.py --server.port 8501 --server.headless true > ../logs/dashboard.log 2>&1 &
-DASHBOARD_PID=$!
-echo "  PID: $DASHBOARD_PID (logs: logs/dashboard.log)"
-cd ..
-
+echo "Starting plutus-dashboard (Streamlit) on port $DASH_PORT..."
+.venv/bin/streamlit run src/plutus/dashboard/app.py \
+    --server.port $DASH_PORT --server.headless true > logs/dashboard.log 2>&1 &
+DASH_PID=$!
+echo "  PID: $DASH_PID (logs: logs/dashboard.log)"
 sleep 5
 
-# Check if dashboard started
-if ! curl -s http://localhost:8501 > /dev/null 2>&1; then
+if ! curl -s "http://localhost:$DASH_PORT" > /dev/null 2>&1; then
     echo "⚠️  Streamlit may still be starting. Check logs/dashboard.log"
 else
-    echo "✓ Streamlit running at http://localhost:8501"
+    echo "✓ Streamlit running at http://localhost:$DASH_PORT"
 fi
 
 echo ""
 echo "=== Services Running ==="
+echo "FastAPI:    http://localhost:$API_PORT   (/healthz, /docs)"
+echo "Dashboard:  http://localhost:$DASH_PORT"
 echo ""
-echo "FastAPI (main):      http://localhost:8009"
-echo "  - Health check:    http://localhost:8009/healthz"
-echo "  - API docs:        http://localhost:8009/docs"
-echo ""
-echo "Streamlit Dashboard: http://localhost:8501"
-echo ""
-echo "Logs:"
-echo "  - Main:            logs/main.log"
-echo "  - Dashboard:       logs/dashboard.log"
-echo ""
-echo "PIDs:"
-echo "  - Main:            $MAIN_PID"
-echo "  - Dashboard:       $DASHBOARD_PID"
-echo ""
-echo "To stop all services:"
-echo "  kill $MAIN_PID $DASHBOARD_PID"
-echo ""
-echo "Or use: ./local-stop.sh"
-echo ""
+echo "Logs: logs/api.log, logs/dashboard.log"
+echo "PIDs: api=$API_PID dashboard=$DASH_PID"
+echo "Stop: ./local-stop.sh"
 
-# Save PIDs for stop script
-echo "$MAIN_PID" > logs/main.pid
-echo "$DASHBOARD_PID" > logs/dashboard.pid
+echo "$API_PID"  > logs/api.pid
+echo "$DASH_PID" > logs/dashboard.pid
 
-echo "=== Ready for Testing ==="
 echo ""
-echo "Try these commands:"
-echo "  1. Open dashboard:  open http://localhost:8501"
-echo "  2. Test API:        curl http://localhost:8009/healthz"
-echo "  3. View logs:       tail -f logs/main.log"
-echo ""
+echo "=== Ready ==="
+echo "  open http://localhost:$DASH_PORT"
+echo "  curl http://localhost:$API_PORT/healthz"
+echo "  tail -f logs/api.log"

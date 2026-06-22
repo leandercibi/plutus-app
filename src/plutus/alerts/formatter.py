@@ -50,9 +50,19 @@ class AlertFormatter:
             kind="T1_HIT",
             symbol=symbol,
             title=f"T1 HIT {symbol}",
-            body_md=f"*{symbol}* reached target 1",
+            body_md=f"*{symbol}* reached target 1 — consider trimming half position",
             severity="INFO",
             deduplication_key=f"{symbol}:T1_HIT:{on.isoformat()}",
+        )
+
+    def format_t2_hit(self, symbol: str, on: date) -> AlertMessage:
+        return AlertMessage(
+            kind="T2_HIT",
+            symbol=symbol,
+            title=f"T2 HIT {symbol}",
+            body_md=f"*{symbol}* reached target 2 — consider exiting remainder",
+            severity="INFO",
+            deduplication_key=f"{symbol}:T2_HIT:{on.isoformat()}",
         )
 
     def format_regime_flip(

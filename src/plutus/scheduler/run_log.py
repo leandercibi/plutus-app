@@ -4,22 +4,11 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Literal
 
-from sqlalchemy import JSON, DateTime, String
-from sqlalchemy.orm import Mapped, Session, mapped_column
+from sqlalchemy.orm import Session
 
-from plutus.db.models import Base
+from plutus.db.models import RunLogRow
 
 RunStatus = Literal["OK", "FAILED", "ABORTED"]
-
-
-class RunLogRow(Base):
-    __tablename__ = "run_log"
-    run_id: Mapped[str] = mapped_column(String(64), primary_key=True)
-    job_name: Mapped[str] = mapped_column(String(48), index=True)
-    started_at: Mapped[datetime] = mapped_column(DateTime)
-    ended_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    status: Mapped[str | None] = mapped_column(String(8), nullable=True)
-    details_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
 
 
 @dataclass

@@ -222,4 +222,33 @@ __marimo__/
 !.crew/artifacts/
 !.crew/graphs/
 !.crew/artifacts/.gitkeep
-!.crew/graphs/.gitkeep
+!.crew/graphs/.gitkeepcache/
+cache/
+
+# ── Plutus: local databases ──────────────────────────────────────────────────
+plutus.db
+plutus.db-wal
+plutus.db-shm
+*.sqlite3
+*.db
+
+# ── Plutus: internal planning & spec docs ────────────────────────────────────
+docs/
+specs/
+teach/
+
+# ── Plutus: agent / AI harness artifacts ─────────────────────────────────────
+.pi/
+pi-harness.ts
+
+# ── Plutus: local run artifacts ───────────────────────────────────────────────
+*.log
+logs/
+/tmp/
+
+# ── Plutus: local env & secrets (belt-and-suspenders) ────────────────────────
+.env
+.env.*
+!.env.example
+secrets.json
+

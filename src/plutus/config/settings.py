@@ -15,6 +15,9 @@ class Settings(BaseSettings):
     # --- database ---
     db_url: str = "sqlite:///./plutus.db"
 
+    # --- portfolio ---
+    total_capital_inr: int = 100_000
+
     # --- risk (resolves A6) ---
     risk_per_trade_pct: float = 0.01
     max_concurrent_swing_positions: int = 10
@@ -79,11 +82,24 @@ class Settings(BaseSettings):
     # --- tuner (A14) ---
     auto_tune_enabled: bool = False
 
+    # --- accumulation (A12, A13, B9) ---
+    accumulation_de_max: float = 1.5
+    accumulation_n_tranches: int = 5
+
+    # --- api ---
+    api_token: SecretStr | None = None
+
     # --- data providers ---
     provider_primary_ohlcv: Literal["yfinance", "nse", "tickertape"] = "yfinance"
     provider_fallback_ohlcv: Literal["nse", "tickertape", "none"] = "nse"
     cache_ttl_ohlcv_hours: int = 6
     freshness_assert_enabled: bool = True
+
+    # --- Angel One SmartAPI ---
+    angel_api_key: str = ""
+    angel_client_id: str = ""
+    angel_password: str = ""
+    angel_totp_secret: str = ""
 
     # --- secrets ---
     openrouter_api_key: SecretStr | None = None

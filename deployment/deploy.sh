@@ -1,17 +1,15 @@
 #!/bin/bash
 set -e
 export PAGER=cat
-export PGPASSWORD=plutus
 
-# Plutus Deployment Script for Ubuntu 22.04 (ARM64)
-# Consolidates Steps 1-7 from 15_deployment.md
+# Plutus v2 Deployment Script for Ubuntu 22.04 (ARM64)
+# Greenfield v2 layout: repo-root .venv + .env, pyproject.toml, src/plutus package.
+# Services: plutus-api (uvicorn), plutus-scheduler (APScheduler), plutus-dashboard (Streamlit).
 
-echo "=== Step 1: Initial OCI Instance Setup ==="
+ROOT=/home/ubuntu/plutus-app
 
-# Update system
+echo "=== Step 1: System packages ==="
 sudo apt update && sudo apt upgrade -y
-
-# Install required system packages
 sudo apt install -y \
   python3.11 python3.11-venv python3.11-dev \
   build-essential libssl-dev libffi-dev libpq-dev \
@@ -22,16 +20,12 @@ sudo apt install -y \
 wget -q https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm64.deb
 sudo dpkg -i cloudflared-linux-arm64.deb
 
-# Verify Python version
 python3.11 --version
 
-echo "=== Step 2: PostgreSQL Setup ==="
-
-# Start PostgreSQL
+echo "=== Step 2: PostgreSQL ==="
 sudo systemctl enable postgresql
 sudo systemctl start postgresql
 
-# Create database and user
 sudo -u postgres psql <<'EOF'
 CREATE USER plutus WITH PASSWORD 'plutus';
 CREATE DATABASE plutus_db OWNER plutus;
@@ -39,58 +33,57 @@ GRANT ALL PRIVILEGES ON DATABASE plutus_db TO plutus;
 \q
 EOF
 
-# Test connection
 PGPASSWORD=plutus psql -U plutus -d plutus_db -h 127.0.0.1 --no-psqlrc -t -c "SELECT version();"
 
-echo "=== Step 3: Clone / Upload Project ==="
-echo "Note: This script assumes project is already at /home/ubuntu/plutus-app/"
-echo "If not, run: git clone https://github.com/yourusername/plutus-app.git /home/ubuntu/plutus-app"
-echo "Or use rsync from your Mac: rsync -avz /Users/leander/personal-projects/plutus-app/ ubuntu@<OCI_IP>:/home/ubuntu/plutus-app/"
+echo "=== Step 3: Project ==="
+echo "Assumes the repo is at $ROOT (git clone or rsync from your Mac)."
+echo "  rsync -avz /Users/leander/personal-projects/plutus-app/ ubuntu@<OCI_IP>:$ROOT/"
 
-echo "=== Step 4: Python Environment ==="
-
-cd /home/ubuntu/plutus-app/src
-
-# Create virtual environment
+echo "=== Step 4: Python environment (repo-root venv, pyproject) ==="
+cd "$ROOT"
 python3.11 -m venv .venv
 source .venv/bin/activate
-
-# Install dependencies
 pip install --upgrade pip
-pip install -r requirements.txt
+# Runtime install from pyproject (add [dev] to also run the test suite on the box).
+pip install -e .
 
-# Verify key packages (ARM64 compatibility check)
-python -c "import backtrader; print('backtrader OK')"
-python -c "import pandas_ta; print('pandas_ta OK')"
-python -c "import langgraph; print('langgraph OK')"
-python -c "import telegram; print('python-telegram-bot OK')"
-python -c "import apscheduler; print('apscheduler OK')"
+# Verify key v2 packages (all pure-Python or ARM64 wheels).
 python -c "import fastapi, uvicorn; print('fastapi/uvicorn OK')"
+python -c "import streamlit; print('streamlit OK')"
+python -c "import apscheduler; print('apscheduler OK')"
+python -c "import sqlalchemy, pydantic, pandas, numpy, scipy; print('core OK')"
 
-echo "=== Step 5: Environment Variables ==="
-echo "Please create /home/ubuntu/plutus-app/src/.env from the template in 03_config_env.md"
-echo "After creating, run: chmod 600 /home/ubuntu/plutus-app/src/.env"
-read -p "Press Enter after you've created the .env file..."
+echo "=== Step 5: Environment file (repo root .env) ==="
+echo "Create $ROOT/.env from .env.example and fill secrets/DB_URL."
+echo "  cp $ROOT/.env.example $ROOT/.env && nano $ROOT/.env"
+echo "Prod requires: ENVIRONMENT=prod, a non-sqlite DB_URL, FRESHNESS_ASSERT_ENABLED=true."
+read -p "Press Enter after you've created and secured (.env -> chmod 600) the .env file..."
+chmod 600 "$ROOT/.env" || true
 
-echo "=== Step 6: Initialize Database ==="
-
-cd /home/ubuntu/plutus-app/src
+echo "=== Step 6: Initialize database ==="
+cd "$ROOT"
 source .venv/bin/activate
-
 python -m plutus.db.init_db
+echo "Schema created."
 
-echo "=== Step 7: Test Run ==="
-echo "Testing agent pipeline..."
-
+echo "=== Step 7: Smoke test (v2 entry points) ==="
+# API app imports and exposes /healthz.
+python -c "from plutus.api.main import app; print('FastAPI app OK')"
+# Scheduler wires its jobs.
 python -c "
-from plutus.agents.graph import run_analysis
-r = run_analysis('RELIANCE', 'NSE', use_cache=False)
-print(r['recommendation'], r.get('confidence'))
+from plutus.config.settings import get_settings
+from plutus.scheduler.runner import build_scheduler
+s = build_scheduler(get_settings())
+print('scheduler jobs:', sorted(j.id for j in s.get_jobs()))
 "
+# Dashboard entry point exists.
+test -f src/plutus/dashboard/app.py && echo "dashboard entry OK"
 
 echo ""
-echo "=== Deployment Complete ==="
-echo "Next steps:"
-echo "1. Set up systemd services (see deployment/README.md Step 8)"
-echo "2. Configure OCI firewall (see deployment/README.md Step 9)"
-echo "3. Set up Cloudflare Tunnel (see deployment/README.md Step 10)"
+echo "=== Deployment prepared ==="
+echo "Next: install systemd units (Step 8 in deployment/README.md):"
+echo "  sudo cp deployment/plutus-api.service       /etc/systemd/system/"
+echo "  sudo cp deployment/plutus-scheduler.service /etc/systemd/system/"
+echo "  sudo cp deployment/plutus-dashboard.service /etc/systemd/system/"
+echo "  sudo systemctl daemon-reload"
+echo "  sudo systemctl enable --now plutus-api plutus-scheduler plutus-dashboard"

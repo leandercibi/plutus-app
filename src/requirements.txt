@@ -20,6 +20,9 @@ pandas==2.2.2
 numpy==2.0.2  # bumped from 1.26.4 — required by pandas-ta-classic 0.3.78 and supported by pandas 2.2.2
 pandas-ta-classic==0.3.78  # maintained fork; original pandas-ta is no longer on PyPI for Python 3.11
 requests==2.32.3
+smartapi-python==1.5.5
+pyotp==2.9.0
+logzero==1.7.0
 feedparser==6.0.11
 beautifulsoup4==4.12.3
 lxml==5.2.2

@@ -34,3 +34,12 @@ def weekly_postmortem_trigger() -> CronTrigger:
 
 def midweek_mini_screen_trigger() -> CronTrigger:
     return CronTrigger(day_of_week="wed", hour=19, minute=0, timezone=_TZ)
+
+
+def hourly_price_check_trigger() -> CronTrigger:
+    return CronTrigger(
+        day_of_week="mon-fri",
+        hour="9-15",
+        minute=30,
+        timezone=_TZ,
+    )

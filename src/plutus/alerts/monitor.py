@@ -30,4 +30,4 @@ class AlertMonitor:
 
 
 def _is_cooldown_kind(kind: str) -> bool:
-    return kind in {"SL_BREACH", "SL_WARNING", "T1_HIT", "NO_PROGRESS"}
+    return kind in {"SL_BREACH", "SL_WARNING", "T1_HIT", "T2_HIT", "NO_PROGRESS"}

@@ -12,11 +12,14 @@ class TechnicalScore:
 
     Trend alignment + RSI + MACD are treated as ONE factor (not three additive
     pillars). Freed weight goes to ATR percentile and a mean-reversion flag.
+    MACD crossover + Bollinger squeeze combo adds bonus points.
     """
 
     trend_momentum: float  # 0..18
     atr_percentile: float  # 0..6
     mean_reversion: float  # 0..6
+    macd_cross_bonus: float  # 0..4
+    bollinger_squeeze_bonus: float  # 0..3
     total: int  # 0..30
 
 
@@ -29,12 +32,40 @@ def _rsi(close: pd.Series, period: int = 14) -> float:
     return float(rsi.iloc[-1]) if not np.isnan(rsi.iloc[-1]) else 50.0
 
 
-def _macd_hist(close: pd.Series) -> float:
+def _macd_components(close: pd.Series) -> tuple[float, float, float]:
     ema12 = close.ewm(span=12, adjust=False).mean()
     ema26 = close.ewm(span=26, adjust=False).mean()
     macd = ema12 - ema26
     signal = macd.ewm(span=9, adjust=False).mean()
-    return float((macd - signal).iloc[-1])
+    hist = macd - signal
+    return float(macd.iloc[-1]), float(signal.iloc[-1]), float(hist.iloc[-1])
+
+
+def _macd_crossover(close: pd.Series) -> bool:
+    ema12 = close.ewm(span=12, adjust=False).mean()
+    ema26 = close.ewm(span=26, adjust=False).mean()
+    macd = ema12 - ema26
+    signal = macd.ewm(span=9, adjust=False).mean()
+    if len(macd) < 3:
+        return False
+    return bool(macd.iloc[-1] > signal.iloc[-1] and macd.iloc[-2] <= signal.iloc[-2])
+
+
+def _bollinger_squeeze(close: pd.Series, lookback: int = 5) -> bool:
+    bb_std = close.rolling(20).std()
+    bb_mid = close.rolling(20).mean()
+    if bb_mid.iloc[-1] == 0 or len(bb_std.dropna()) < lookback + 1:
+        return False
+    width = (bb_std / bb_mid).dropna()
+    if len(width) < lookback + 1:
+        return False
+    recent_width = float(width.iloc[-1])
+    min_width = float(width.iloc[-(lookback + 1):-1].min())
+    expanding = recent_width > min_width * 1.1
+    price = float(close.iloc[-1])
+    upper = float(bb_mid.iloc[-1] + 2 * bb_std.iloc[-1])
+    breakout = price > upper * 0.98
+    return bool(expanding and breakout)
 
 
 def technical_score(candles: pd.DataFrame) -> TechnicalScore:
@@ -50,7 +81,8 @@ def technical_score(candles: pd.DataFrame) -> TechnicalScore:
 
     aligned = price > dma50 > dma200
     rsi = _rsi(close)
-    macd_pos = _macd_hist(close) > 0
+    _macd_val, _macd_sig, macd_h = _macd_components(close)
+    macd_pos = macd_h > 0
 
     trend_momentum = 0.0
     if aligned:
@@ -74,10 +106,16 @@ def technical_score(candles: pd.DataFrame) -> TechnicalScore:
 
     mean_reversion = 6.0 if rsi < 35 else 0.0
 
-    total = int(round(min(30.0, trend_momentum + atr_percentile + mean_reversion)))
+    macd_cross_bonus = 4.0 if _macd_crossover(close) else 0.0
+    bb_squeeze_bonus = 3.0 if _bollinger_squeeze(close) else 0.0
+
+    raw = trend_momentum + atr_percentile + mean_reversion + macd_cross_bonus + bb_squeeze_bonus
+    total = int(round(min(30.0, raw)))
     return TechnicalScore(
         trend_momentum=trend_momentum,
         atr_percentile=atr_percentile,
         mean_reversion=mean_reversion,
+        macd_cross_bonus=macd_cross_bonus,
+        bollinger_squeeze_bonus=bb_squeeze_bonus,
         total=total,
     )

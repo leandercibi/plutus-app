@@ -201,13 +201,20 @@ class AccumulationCandidate(Base):
     run_id: Mapped[str] = mapped_column(String(64), index=True)
     symbol: Mapped[str] = mapped_column(String(32), index=True)
     score: Mapped[int]
+    label: Mapped[str | None] = mapped_column(String(20), nullable=True)
     rs_30: Mapped[float]
     rs_90: Mapped[float]
     rs_180: Mapped[float]
+    quality_pillar: Mapped[int | None] = mapped_column(nullable=True)
+    growth_pillar: Mapped[int | None] = mapped_column(nullable=True)
+    valuation_pillar: Mapped[int | None] = mapped_column(nullable=True)
+    rs_pillar: Mapped[int | None] = mapped_column(nullable=True)
     cagr_eps_3y: Mapped[float | None] = mapped_column(nullable=True)
+    cagr_eps_5y: Mapped[float | None] = mapped_column(nullable=True)
     valuation_pillar_pct: Mapped[float]
     thesis_text: Mapped[str]
     hard_avoid_active: Mapped[bool] = mapped_column(default=False)
+    hard_avoid_reasons_json: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime]
 
 
@@ -220,6 +227,7 @@ class AccumulationPosition(Base):
     qty_total: Mapped[int]
     opened_at: Mapped[datetime]
     last_thesis_check_at: Mapped[datetime]
+    paused_reason: Mapped[str | None] = mapped_column(String(256), nullable=True)
     __table_args__ = (
         CheckConstraint("qty_total >= 0", name="ck_accum_qty_nonneg"),
         CheckConstraint(
@@ -234,6 +242,7 @@ class Tranche(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     position_id: Mapped[int] = mapped_column(ForeignKey("accumulation_position.id"))
     seq: Mapped[int]
+    qty: Mapped[int | None] = mapped_column(nullable=True)
     atr_normalized_trigger_pct: Mapped[float]
     filled_at_price: Mapped[Decimal | None] = mapped_column(
         Numeric(14, 2), nullable=True
@@ -274,6 +283,37 @@ class AlertCooldown(Base):
     )
 
 
+class Notification(Base):
+    __tablename__ = "notification"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    kind: Mapped[str] = mapped_column(String(32), index=True)
+    severity: Mapped[str] = mapped_column(String(16))
+    title: Mapped[str] = mapped_column(String(128))
+    body: Mapped[str] = mapped_column(String(512))
+    symbol: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    dismissed: Mapped[bool] = mapped_column(default=False)
+    created_at: Mapped[datetime]
+    __table_args__ = (
+        CheckConstraint(
+            "kind IN ('SL_PROXIMITY','PNL_UPDATE','T1_PROXIMITY','PRICE_ALERT','SL_BREACH')",
+            name="ck_notification_kind",
+        ),
+        CheckConstraint(
+            "severity IN ('INFO','WARNING','URGENT')",
+            name="ck_notification_severity",
+        ),
+    )
+
+
+class LatestPrice(Base):
+    __tablename__ = "latest_price"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    symbol: Mapped[str] = mapped_column(String(32), unique=True, index=True)
+    price: Mapped[Decimal] = mapped_column(Numeric(14, 2))
+    source: Mapped[str] = mapped_column(String(16))
+    fetched_at: Mapped[datetime]
+
+
 class DrawdownGovernorState(Base):
     """B4. Single-row upserted state for the 3-day recovery rule."""
 
@@ -284,3 +324,31 @@ class DrawdownGovernorState(Base):
     high_water_mark: Mapped[Decimal] = mapped_column(Numeric(20, 2))
     multiplier: Mapped[float]
     consecutive_recovery_days: Mapped[int] = mapped_column(default=0)
+
+
+class RunLogRow(Base):
+    """Scheduler job run history (spec 13 §8)."""
+
+    __tablename__ = "run_log"
+    run_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    job_name: Mapped[str] = mapped_column(String(48), index=True)
+    started_at: Mapped[datetime]
+    ended_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    status: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    details_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+
+
+class WalkForwardRun(Base):
+    """4B. IS/OOS walk-forward results per (symbol, bundle) run."""
+
+    __tablename__ = "walk_forward_run"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    symbol: Mapped[str] = mapped_column(String(32), index=True)
+    bundle: Mapped[str] = mapped_column(String(32))
+    window_days: Mapped[int]
+    step_days: Mapped[int]
+    is_sharpe_median: Mapped[float]
+    oos_sharpe_median: Mapped[float]
+    overfit_flag: Mapped[bool]
+    windows_json: Mapped[list[dict[str, Any]]] = mapped_column(JSON)
+    created_at: Mapped[datetime]

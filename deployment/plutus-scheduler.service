@@ -1,0 +1,18 @@
+# /etc/systemd/system/plutus-scheduler.service
+[Unit]
+Description=Plutus v2 — APScheduler (Sunday full, Monday re-val, daily exit, freshness, postmortem)
+After=network.target postgresql.service plutus-api.service
+Requires=postgresql.service
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/plutus-app
+Environment=PATH=/home/ubuntu/plutus-app/.venv/bin
+EnvironmentFile=/home/ubuntu/plutus-app/.env
+ExecStart=/home/ubuntu/plutus-app/.venv/bin/python -m plutus.scheduler.runner
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
