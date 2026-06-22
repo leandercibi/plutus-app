@@ -213,12 +213,32 @@ def get_chart(
     from plutus.config.settings import get_settings
     from plutus.data.providers.yfinance_provider import YFinanceProvider
 
-    # --- Daily bars (yfinance, full year + 60-day indicator warmup) ---
+    # --- Daily bars (Angel One preferred; yfinance fallback) ---
     end = date.today()
     fetch_days = max(days + 60, 300)
     start = end - timedelta(days=fetch_days)
-    provider = YFinanceProvider()
-    df = provider.fetch(symbol, start, end)
+    settings = get_settings()
+    df = None
+    if all([settings.angel_api_key, settings.angel_client_id,
+            settings.angel_password, settings.angel_totp_secret]):
+        try:
+            from plutus.data.providers.angelone_provider import AngelOneProvider
+            angel = AngelOneProvider(
+                api_key=settings.angel_api_key,
+                client_id=settings.angel_client_id,
+                password=settings.angel_password,
+                totp_secret=settings.angel_totp_secret,
+            )
+            df = angel.fetch(symbol, start, end)
+        except Exception:
+            df = None
+    if df is None or df.empty:
+        try:
+            df = YFinanceProvider().fetch(symbol, start, end)
+        except Exception as exc:
+            raise HTTPException(status_code=404, detail=f"No chart data for {symbol}") from exc
+    if df is None or df.empty:
+        raise HTTPException(status_code=404, detail=f"No chart data for {symbol}")
     df = _add_indicators(df)
 
     # latest price uses full history (not display slice) for accuracy
@@ -233,7 +253,6 @@ def get_chart(
     # --- Intraday bars (Angel One ONE_HOUR, 60 days) ---
     # Fetched once and cached on the client; duration switches are client-side slices.
     intraday_bars: list[ChartBarOut] = []
-    settings = get_settings()
     if all([
         settings.angel_api_key,
         settings.angel_client_id,
