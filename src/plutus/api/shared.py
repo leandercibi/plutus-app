@@ -274,11 +274,12 @@ def get_chart(
         _chart_cache.set(daily_key, df, _DAILY_TTL)
     df = _add_indicators(df)
 
-    # latest price uses full history (not display slice) for accuracy
+    # prev close from cached bars; latest price fetched live on every request
     close = df["close"]
-    latest = close.iloc[-1]
-    prev = close.iloc[-2] if len(close) > 1 else latest
-    change_pct = ((latest - prev) / prev) * 100 if prev != 0 else 0.0
+    prev = close.iloc[-1]
+    live_prices = _fetch_live_prices({symbol.upper()}, settings, db)
+    latest = live_prices.get(symbol.upper()) or float(prev)
+    change_pct = ((latest - float(prev)) / float(prev)) * 100 if prev != 0 else 0.0
 
     display_df = df.iloc[-days:]
     bars = _df_to_bars(display_df, is_intraday=False)
