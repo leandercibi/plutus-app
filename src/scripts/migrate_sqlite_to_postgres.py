@@ -15,7 +15,22 @@ from __future__ import annotations
 import argparse
 import sys
 
-from sqlalchemy import create_engine, inspect, text
+from sqlalchemy import Boolean, create_engine, inspect, text
+from sqlalchemy.sql.sqltypes import JSON
+
+
+def _bool_cols(table) -> set[str]:
+    """Return column names that are Boolean in the ORM table definition."""
+    return {c.name for c in table.columns if isinstance(c.type, Boolean)}
+
+
+def _coerce_row(row: dict, bool_cols: set[str]) -> dict:
+    """Cast SQLite 0/1 integers to Python bool for PostgreSQL boolean columns."""
+    out = dict(row)
+    for col in bool_cols:
+        if col in out and out[col] is not None:
+            out[col] = bool(out[col])
+    return out
 
 
 def migrate(src_url: str, dst_url: str, dry_run: bool = False) -> None:
@@ -29,12 +44,22 @@ def migrate(src_url: str, dst_url: str, dry_run: bool = False) -> None:
     if not dry_run:
         Base.metadata.create_all(dst_engine)
 
-    tables = [t.name for t in Base.metadata.sorted_tables]
-    print(f"→ Tables to migrate ({len(tables)}): {', '.join(tables)}\n")
+    tables = [t for t in Base.metadata.sorted_tables]
+    print(f"→ Tables to migrate ({len(tables)}): {', '.join(t.name for t in tables)}\n")
 
     with src_engine.connect() as src_conn, dst_engine.connect() as dst_conn:
         inspector = inspect(src_engine)
-        for table_name in tables:
+
+        if not dry_run:
+            # Truncate all tables in reverse dependency order so cascades don't interfere
+            dst_conn.execute(text("SET session_replication_role = replica"))
+            all_names = ", ".join(t.name for t in reversed(tables))
+            dst_conn.execute(text(f"TRUNCATE TABLE {all_names}"))
+            dst_conn.commit()
+            dst_conn.execute(text("SET session_replication_role = DEFAULT"))
+
+        for table in tables:
+            table_name = table.name
             if table_name not in inspector.get_table_names():
                 print(f"  skip {table_name} (not in source)")
                 continue
@@ -49,32 +74,35 @@ def migrate(src_url: str, dst_url: str, dry_run: bool = False) -> None:
                 print("(dry-run)")
                 continue
 
-            # Truncate destination table first to avoid PK conflicts on re-run
-            dst_conn.execute(text(f"TRUNCATE TABLE {table_name} CASCADE"))
-
-            cols = rows[0].keys()
+            bool_cols = _bool_cols(table)
+            cols = list(rows[0].keys())
+            # Quote column names to preserve mixed-case (PostgreSQL folds unquoted to lowercase)
+            col_list = ", ".join(f'"{c}"' for c in cols)
             placeholders = ", ".join(f":{c}" for c in cols)
-            col_list = ", ".join(cols)
             stmt = text(f"INSERT INTO {table_name} ({col_list}) VALUES ({placeholders})")
-            dst_conn.execute(stmt, [dict(r) for r in rows])
+            # Disable FK checks per-table insert to avoid ordering issues
+            dst_conn.execute(text("SET session_replication_role = replica"))
+            dst_conn.execute(stmt, [_coerce_row(dict(r), bool_cols) for r in rows])
+            dst_conn.execute(text("SET session_replication_role = DEFAULT"))
             dst_conn.commit()
             print("done")
 
         # Reset all sequences (PostgreSQL auto-increment)
         if not dry_run:
             print("\n→ Resetting PostgreSQL sequences…")
-            seq_sql = """
-                SELECT 'SELECT setval(' || quote_literal(sequence_name) ||
-                       ', (SELECT MAX(' || quote_ident(column_name) ||
-                       ') FROM ' || quote_ident(table_name) || ') + 1)'
+            seq_sql = text("""
+                SELECT table_name, column_name,
+                       pg_get_serial_sequence(table_name, column_name) AS seq
                 FROM information_schema.columns
-                WHERE column_default LIKE 'nextval%'
-                  AND table_schema = 'public';
-            """
-            reset_stmts = dst_conn.execute(text(seq_sql)).fetchall()
-            for (stmt_text,) in reset_stmts:
-                if stmt_text:
-                    dst_conn.execute(text(stmt_text))
+                WHERE table_schema = 'public'
+                  AND column_default LIKE 'nextval%%'
+            """)
+            for table_name, col_name, seq_name in dst_conn.execute(seq_sql).fetchall():
+                if seq_name:
+                    dst_conn.execute(text(
+                        f"SELECT setval('{seq_name}', "
+                        f"COALESCE((SELECT MAX({col_name}) FROM {table_name}), 1))"
+                    ))
             dst_conn.commit()
             print("  sequences reset")
 

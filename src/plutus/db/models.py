@@ -107,7 +107,7 @@ class CalibrationRow(Base):
             "sprt_state IN ('accept_H0','accept_H1','continue')", name="ck_calib_sprt"
         ),
         CheckConstraint(
-            "ci_low_R <= expectancy_R AND expectancy_R <= ci_high_R",
+            '"ci_low_R" <= "expectancy_R" AND "expectancy_R" <= "ci_high_R"',
             name="ck_calib_ci_order",
         ),
         CheckConstraint(
@@ -167,7 +167,7 @@ class SwingTrade(Base):
         ),
         CheckConstraint(
             "state NOT IN ('CLOSED_WIN','CLOSED_LOSS') "
-            "OR (closed_at IS NOT NULL AND realized_R IS NOT NULL)",
+            'OR (closed_at IS NOT NULL AND "realized_R" IS NOT NULL)',
             name="ck_swing_trade_close_requires_fields",
         ),
     )
