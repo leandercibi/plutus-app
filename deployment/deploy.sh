@@ -46,6 +46,7 @@ if [ ! -d "$VENV" ]; then
 fi
 "$VENV/bin/pip" install --upgrade pip -q
 "$VENV/bin/pip" install -r src/requirements.txt -q
+"$VENV/bin/pip" install -e . -q
 green "  Dependencies installed"
 
 green "=== [4/7] Environment file ==="
