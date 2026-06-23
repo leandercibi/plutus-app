@@ -13,6 +13,23 @@ from plutus.config.logging import get_logger
 from plutus.config.settings import Settings, get_settings
 from plutus.scheduler import triggers
 
+
+def _build_ohlcv_chain(settings: Settings):  # type: ignore[no-untyped-def]
+    from plutus.data.ohlcv import OHLCVChain
+    from plutus.data.providers.yfinance_provider import YFinanceProvider
+
+    fallback = YFinanceProvider()
+    if settings.angel_api_key and settings.angel_client_id and settings.angel_totp_secret:
+        from plutus.data.providers.angelone_provider import AngelOneProvider
+        primary = AngelOneProvider(
+            api_key=settings.angel_api_key,
+            client_id=settings.angel_client_id,
+            password=settings.angel_password,
+            totp_secret=settings.angel_totp_secret,
+        )
+        return OHLCVChain(primary=primary, fallback=fallback)
+    return OHLCVChain(primary=fallback, fallback=None)
+
 logger = get_logger(__name__)
 
 _TZ = "Asia/Kolkata"
@@ -33,13 +50,11 @@ def _build_sunday_callable(settings: Settings):  # type: ignore[no-untyped-def]
     try:
         from plutus.alerts.factory import build_alert_monitor
         from plutus.alerts.formatter import AlertFormatter
-        from plutus.data.ohlcv import OHLCVChain
         from plutus.data.providers.breadth_provider import BreadthYFinanceProvider
         from plutus.data.providers.delivery_stub import DeliveryStubProvider
         from plutus.data.providers.fii_dii_provider import FIIDIIStubProvider
         from plutus.data.providers.regime_builder import build_regime_inputs
         from plutus.data.providers.vix_provider import VixYFinanceProvider
-        from plutus.data.providers.yfinance_provider import YFinanceProvider
         from plutus.db.init_db import init_db
         from plutus.db.session import session_scope
         from plutus.scheduler.jobs import sunday_full_run_job
@@ -52,7 +67,7 @@ def _build_sunday_callable(settings: Settings):  # type: ignore[no-untyped-def]
         universe = _load_universe()
         monitor = build_alert_monitor(settings)
         formatter = AlertFormatter()
-        ohlcv_chain = OHLCVChain(primary=YFinanceProvider(), fallback=None)
+        ohlcv_chain = _build_ohlcv_chain(settings)
         delivery = DeliveryStubProvider()
         regime_inputs = build_regime_inputs(
             as_of=now.date(),
@@ -82,8 +97,6 @@ def _build_exit_monitor_callable(settings: Settings):  # type: ignore[no-untyped
     try:
         from plutus.alerts.factory import build_alert_monitor
         from plutus.alerts.formatter import AlertFormatter
-        from plutus.data.ohlcv import OHLCVChain
-        from plutus.data.providers.yfinance_provider import YFinanceProvider
         from plutus.db.session import session_scope
         from plutus.scheduler.jobs import daily_exit_monitor_job
     except ImportError as exc:
@@ -94,7 +107,7 @@ def _build_exit_monitor_callable(settings: Settings):  # type: ignore[no-untyped
         now = datetime.now(tz=UTC).replace(tzinfo=None)
         monitor = build_alert_monitor(settings)
         formatter = AlertFormatter()
-        ohlcv_chain = OHLCVChain(primary=YFinanceProvider(), fallback=None)
+        ohlcv_chain = _build_ohlcv_chain(settings)
         with session_scope() as session:
             result = daily_exit_monitor_job(
                 session=session,
