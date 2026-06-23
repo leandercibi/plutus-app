@@ -20,6 +20,8 @@ _RATE_LOCK = threading.Lock()
 _LAST_CALL = [0.0]
 _MIN_INTERVAL = 1.0  # 1 request per second
 
+_RATE_EXCEEDED_PHRASES = (b"exceeding access rate", b"rate limit", b"too many requests")
+
 
 def _load_instruments() -> dict[str, str]:
     global _INSTRUMENT_CACHE
@@ -122,8 +124,6 @@ class AngelOneProvider:
 
     def _getCandleData(self, symbol: str, interval: str, start: date, end: date) -> pd.DataFrame:
         token = _resolve_token(symbol)
-        _rate_wait()
-        obj = self._session()
         params = {
             "exchange": "NSE",
             "symboltoken": token,
@@ -131,15 +131,37 @@ class AngelOneProvider:
             "fromdate": f"{start.isoformat()} 09:00",
             "todate": f"{(end + timedelta(days=1)).isoformat()} 15:30",
         }
-        data = obj.getCandleData(params)
-        if not data or not data.get("data"):
-            raise ValueError(f"Angel One returned no candle data for {symbol}")
-        df = pd.DataFrame(
-            data["data"],
-            columns=["timestamp", "open", "high", "low", "close", "volume"],
-        )
-        df["date"] = pd.to_datetime(df["timestamp"]).dt.tz_localize(None)
-        return df[["date", "open", "high", "low", "close", "volume"]].dropna(subset=["close"])
+        last_exc: Exception = ValueError("no attempts made")
+        for attempt in range(3):
+            if attempt > 0:
+                time.sleep(2 ** attempt)  # 2s, 4s
+            _rate_wait()
+            obj = self._session()
+            try:
+                data = obj.getCandleData(params)
+            except Exception as exc:
+                raw = str(exc).encode()
+                if any(p in raw.lower() for p in _RATE_EXCEEDED_PHRASES):
+                    last_exc = exc
+                    continue
+                raise
+            # SmartAPI returns raw bytes in the error field when rate-limited
+            if isinstance(data, (bytes, str)):
+                raw = data if isinstance(data, bytes) else data.encode()
+                if any(p in raw.lower() for p in _RATE_EXCEEDED_PHRASES):
+                    last_exc = ValueError(f"Angel One rate limit: {raw[:120]}")
+                    invalidate_session()
+                    continue
+                raise ValueError(f"Angel One unexpected response for {symbol}: {raw[:120]}")
+            if not data or not data.get("data"):
+                raise ValueError(f"Angel One returned no candle data for {symbol}")
+            df = pd.DataFrame(
+                data["data"],
+                columns=["timestamp", "open", "high", "low", "close", "volume"],
+            )
+            df["date"] = pd.to_datetime(df["timestamp"]).dt.tz_localize(None)
+            return df[["date", "open", "high", "low", "close", "volume"]].dropna(subset=["close"])
+        raise last_exc
 
     def fetch(self, symbol: str, start: date, end: date) -> pd.DataFrame:
         return self._getCandleData(symbol, "ONE_DAY", start, end)
