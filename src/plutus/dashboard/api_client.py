@@ -139,9 +139,19 @@ def enter_from_signal(
         return False, f"network error: {e}"
 
 
-def manual_exit(trade_id: int, reason: str) -> tuple[bool, str]:
+def manual_exit(
+    trade_id: int,
+    reason: str,
+    qty: int | None = None,
+    price: float | None = None,
+) -> tuple[bool, str]:
+    payload: dict = {"reason": reason}
+    if qty is not None:
+        payload["qty"] = qty
+    if price is not None:
+        payload["price"] = str(price)
     try:
-        r = _post(f"/swing/trades/{trade_id}/exit/manual", json={"reason": reason})
+        r = _post(f"/swing/trades/{trade_id}/exit/manual", json=payload)
         if r.status_code == 200:
             return True, "trade closed"
         return False, f"error {r.status_code}"

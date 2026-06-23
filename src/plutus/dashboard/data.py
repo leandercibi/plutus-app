@@ -82,6 +82,8 @@ class PositionView:
     elapsed_to_t1_pct: float
     trailing_stop: Decimal | None
     is_open: bool
+    qty: int = 0
+    avg_entry: Decimal = Decimal("0")
     exit_reason: str | None = None
     slippage_delta_bps: float | None = None
 

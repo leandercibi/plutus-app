@@ -219,8 +219,27 @@ def load_positions(session: Session) -> list[PositionView]:
         )
         .all()
     )
-    return [
-        PositionView(
+    # Pre-fetch all BUY fills for these trades to compute avg entry
+    trade_ids = [t.id for t in rows]
+    buy_fills: dict[int, list[models.Fill]] = {}
+    if trade_ids:
+        for f in (
+            session.query(models.Fill)
+            .filter(models.Fill.trade_id.in_(trade_ids), models.Fill.side == "BUY")
+            .all()
+        ):
+            buy_fills.setdefault(f.trade_id, []).append(f)
+
+    out = []
+    for t in rows:
+        fills = buy_fills.get(t.id, [])
+        if fills:
+            total_qty = sum(f.qty for f in fills)
+            avg_entry = sum(f.price * f.qty for f in fills) / total_qty if total_qty else Decimal("0")
+        else:
+            total_qty = t.qty or 0
+            avg_entry = Decimal("0")
+        out.append(PositionView(
             trade_id=t.id,
             symbol=t.symbol,
             bundle=t.bundle,
@@ -231,10 +250,11 @@ def load_positions(session: Session) -> list[PositionView]:
             elapsed_to_t1_pct=0.0,
             trailing_stop=None,
             is_open=t.state in ("OPEN", "T1_HIT"),
+            qty=total_qty,
+            avg_entry=avg_entry,
             exit_reason=t.exit_reason,
-        )
-        for t in rows
-    ]
+        ))
+    return out
 
 
 def load_candidates(session: Session) -> list[CandidateView]:

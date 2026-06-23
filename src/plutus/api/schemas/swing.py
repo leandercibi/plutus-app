@@ -94,6 +94,8 @@ class EnterFromSignalIn(BaseModel):
 
 class ManualExitIn(BaseModel):
     reason: str
+    qty: int | None = None
+    price: Decimal | None = None
 
 
 class CooldownRowOut(BaseModel):

@@ -190,10 +190,22 @@ def manual_exit(
     trade = db.get(SwingTrade, trade_id)
     if trade is None:
         raise HTTPException(status_code=404, detail="trade not found")
-    # Manual close. No alert is re-fired here; alerting is the monitor's job.
+    now = datetime.utcnow()
+    # Log a SELL fill if the caller provided qty + price
+    if body.qty is not None and body.price is not None:
+        db.add(Fill(
+            trade_id=trade_id,
+            kind="REAL",
+            side="SELL",
+            qty=body.qty,
+            price=body.price,
+            cost_inr=0,
+            slippage_bps=0,
+            filled_at=now,
+        ))
     realized = trade.realized_R if trade.realized_R is not None else 0.0
     trade.state = "CLOSED_WIN" if realized >= 0 else "CLOSED_LOSS"
-    trade.closed_at = datetime.utcnow()
+    trade.closed_at = now
     trade.realized_R = realized
     trade.exit_reason = body.reason
     db.flush()
