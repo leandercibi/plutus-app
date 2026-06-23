@@ -44,12 +44,26 @@ def _run_quick_score(symbol: str) -> None:
 
     import pandas as pd
 
+    from plutus.config.settings import get_settings
     from plutus.data.providers.yfinance_provider import YFinanceProvider
     from plutus.swing.scoring.pillars import technical_score
 
-    provider = YFinanceProvider()
     end = date.today()
     start = end - timedelta(days=400)
+
+    # Use Angel One as primary on cloud (yfinance blocked); fall back to yfinance locally
+    _settings = get_settings()
+    if _settings.angel_api_key and _settings.angel_client_id and _settings.angel_totp_secret:
+        from plutus.data.providers.angelone_provider import AngelOneProvider
+        provider = AngelOneProvider(
+            api_key=_settings.angel_api_key,
+            client_id=_settings.angel_client_id,
+            password=_settings.angel_password,
+            totp_secret=_settings.angel_totp_secret,
+        )
+    else:
+        provider = YFinanceProvider()
+
     try:
         candles = provider.fetch(symbol, start, end)
     except Exception as exc:
@@ -99,7 +113,10 @@ def _run_quick_score(symbol: str) -> None:
         from plutus.accumulation.rs.blend import RSBlend
 
         rs_engine = RSBlend()
-        nifty = provider.fetch("^NSEI", start, end)
+        try:
+            nifty = YFinanceProvider().fetch("^NSEI", start, end)
+        except Exception:
+            nifty = None
         if nifty is not None and len(nifty) >= 181 and len(candles) >= 200:
             rs = rs_engine.compute(candles, nifty)
             rs_blended = rs.blended
