@@ -246,9 +246,34 @@ pi-harness.ts
 logs/
 /tmp/
 
+# ── Plutus: backend ───────────────────────────────────────────────────────────
+backend/.venv/
+backend/__pycache__/
+backend/src/plutus.egg-info/
+backend/.pytest_cache/
+backend/.mypy_cache/
+backend/.ruff_cache/
+*.pyc
+*.pyo
+
+# ── Plutus: frontend ──────────────────────────────────────────────────────────
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# ── Plutus: Docker deployment ──────────────────────────────────────────────────
+deployment/.env
+
+# ── Plutus: Screenshots and test artifacts ─────────────────────────────────────
+screenshots/
+dashboard_test.png
+test_*.py
+
 # ── Plutus: local env & secrets (belt-and-suspenders) ────────────────────────
 .env
 .env.*
 !.env.example
 secrets.json
 
+
+!.crew/graphs/.gitkeep
