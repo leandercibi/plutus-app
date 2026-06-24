@@ -1,7 +1,7 @@
 # Plutus v2 Deployment Guide
 
 > **Service split.** Plutus v2 runs as **three** application services plus PostgreSQL on a single OCI A1.flex VM.
-> - `plutus-api.service` — FastAPI via uvicorn on `:8000` — `uvicorn plutus.api.main:app`
+> - `plutus-api.service` — FastAPI via uvicorn on `:8007` — `uvicorn plutus.api.main:app`
 > - `plutus-scheduler.service` — APScheduler (Sunday full, Monday re-val, daily exit, freshness, weekly postmortem; midweek mini gated) — `python -m plutus.scheduler.runner`
 > - `plutus-dashboard.service` — Streamlit on `:8501` — `streamlit run src/plutus/dashboard/app.py`
 > - `postgresql.service` (system)
@@ -138,8 +138,8 @@ cd /home/ubuntu/plutus-app
 source .venv/bin/activate
 
 # API (Ctrl-C after a few seconds)
-uvicorn plutus.api.main:app --host 0.0.0.0 --port 8000
-# then in another shell: curl http://localhost:8000/healthz
+uvicorn plutus.api.main:app --host 0.0.0.0 --port 8007
+# then in another shell: curl http://localhost:8007/healthz
 
 # Scheduler — prints the registered job ids and starts (Ctrl-C to stop)
 python -m plutus.scheduler.runner
@@ -184,17 +184,17 @@ In OCI Console → Networking → VCN → Security Lists:
 
 | Protocol | Source | Port | Description |
 |---|---|---|---|
-| TCP | 0.0.0.0/0 | 8000 | FastAPI |
+| TCP | 0.0.0.0/0 | 8007 | FastAPI |
 | TCP | 0.0.0.0/0 | 8501 | Streamlit Dashboard |
 
 ```bash
 sudo ufw allow 22/tcp
-sudo ufw allow 8000/tcp
+sudo ufw allow 8007/tcp
 sudo ufw allow 8501/tcp
 sudo ufw enable
 ```
 
-The FastAPI layer is token-authenticated (`API_TOKEN` in `.env`); only `/healthz` and `/version` are unauthenticated. Consider fronting `:8000` behind the Cloudflare Tunnel rather than opening it publicly.
+The FastAPI layer is token-authenticated (`API_TOKEN` in `.env`); only `/healthz` and `/version` are unauthenticated. Consider fronting `:8007` behind the Cloudflare Tunnel rather than opening it publicly.
 
 ---
 

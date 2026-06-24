@@ -24,8 +24,8 @@ RUN pip install . --no-deps
 
 # ── API target ─────────────────────────────────────────
 FROM base AS api
-EXPOSE 8000
-CMD ["sh", "-c", "alembic upgrade head && uvicorn plutus.api.main:app --host 0.0.0.0 --port 8000 --workers 2"]
+EXPOSE 8007
+CMD ["sh", "-c", "alembic upgrade head && uvicorn plutus.api.main:app --host 0.0.0.0 --port 8007 --workers 2"]
 
 # ── Scheduler target ───────────────────────────────────
 FROM base AS scheduler
