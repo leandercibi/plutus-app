@@ -93,6 +93,14 @@ services:
     ports:
       - "${FRONTEND_PORT:-80}:80"
 
+  # ── Cloudflare quick tunnel (free public HTTPS URL, no account needed) ───
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --url http://frontend:80 --no-autoupdate
+    depends_on:
+      - frontend
+
 volumes:
   pgdata:
   logs:
