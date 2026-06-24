@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import date
-from typing import Any, cast
+from typing import Any, cast, Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from sqlalchemy import select
@@ -59,13 +59,13 @@ def _resolve_run(idempotency_key: str | None) -> str:
     return run_id
 
 
-@router.get("/regime", response_model=RegimeSnapshotOut)
-def get_latest_regime(db: Session = Depends(get_db)) -> RegimeSnapshotOut:
+@router.get("/regime", response_model=Optional[RegimeSnapshotOut])
+def get_latest_regime(db: Session = Depends(get_db)) -> Optional[RegimeSnapshotOut]:
     row = db.execute(
         select(RegimeSnapshot).order_by(RegimeSnapshot.as_of_date.desc()).limit(1)
     ).scalars().first()
     if row is None:
-        raise HTTPException(status_code=404, detail="no regime snapshot")
+        return None
     return RegimeSnapshotOut.model_validate(row, from_attributes=True)
 
 
