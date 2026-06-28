@@ -16,7 +16,7 @@ from plutus.scheduler import triggers
 logger = get_logger(__name__)
 
 _TZ = "Asia/Kolkata"
-_NSE500_CSV = Path(__file__).parents[3] / "scripts" / "nse500.csv"
+_NSE500_CSV = Path(__file__).parents[1] / "data" / "nse500.csv"
 
 
 def _load_universe() -> list[str]:
@@ -57,7 +57,7 @@ def _build_sunday_callable(settings: Settings):  # type: ignore[no-untyped-def]
         regime_inputs = build_regime_inputs(
             as_of=now.date(),
             vix_provider=VixYFinanceProvider(),
-            breadth_provider=BreadthYFinanceProvider(universe),
+            breadth_provider=BreadthYFinanceProvider(),
             fii_dii_provider=FIIDIIStubProvider(),
         )
         init_db()

@@ -519,8 +519,8 @@ def _load_universe_symbols() -> list[str]:
     import csv
     from pathlib import Path
 
-    # 1. CSV — walk up from this file to repo root then into scripts/.
-    csv_path = Path(__file__).resolve().parents[3] / "scripts" / "nse500.csv"
+    # 1. CSV — bundled as package data under plutus/data/.
+    csv_path = Path(__file__).resolve().parents[1] / "data" / "nse500.csv"
     if csv_path.exists():
         with open(csv_path) as f:
             reader = csv.DictReader(f)
