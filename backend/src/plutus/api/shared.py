@@ -351,11 +351,25 @@ def get_ltp(
 
 @router.post("/runs/sunday", response_model=RunOut)
 def run_sunday(idempotency_key: str | None = Header(default=None)) -> RunOut:
+    import logging
     import threading
 
     from plutus.pipeline.sunday import run_sunday_pipeline
+
+    _log = logging.getLogger(__name__)
     run_id = _resolve_run(idempotency_key)
-    threading.Thread(target=run_sunday_pipeline, daemon=True).start()
+
+    def _run() -> None:
+        try:
+            result = run_sunday_pipeline()
+            if result.errors:
+                _log.error("sunday_pipeline errors: %s", result.errors)
+            else:
+                _log.info("sunday_pipeline done: %d signals written", result.signals_written)
+        except Exception:
+            _log.exception("sunday_pipeline crashed")
+
+    threading.Thread(target=_run, daemon=True).start()
     return RunOut(run_id=run_id)
 
 
