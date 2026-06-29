@@ -131,6 +131,9 @@ def invalidate_session() -> None:
 
 
 class AngelOneProvider:
+    name: str = "angelone"
+    adjustment: str = "split_adjusted"
+
     def __init__(
         self,
         api_key: str,
