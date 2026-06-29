@@ -1,8 +1,28 @@
 """NSE-500 seed symbols for universe building.
 
-These are the NSE 500 constituents as of 2025. The list is intentionally
+These are the NSE 500 constituents as of 2026. The list is intentionally
 hard-coded here rather than fetched live so the universe is deterministic.
 Add or remove symbols via scripts/refresh_seed_universe.py.
+
+Last updated: 2026-06-29
+Symbol renames applied:
+  ZOMATO      → ETERNAL     (renamed Oct 2024)
+  AMARAJABAT  → ARE&M       (Amara Raja Energy & Mobility, renamed Oct 2023)
+  MCDOWELL-N  → UNITDSPR    (United Spirits, symbol updated)
+  NAVNETEDU   → NAVNETEDUL  (Navneet Education, symbol updated)
+  REPCO       → REPCOHOME   (Repco Home Finance, symbol updated)
+  PEL         → PIRAMALFIN  (Piramal Enterprises delisted Sep 2025; Piramal Finance listed Nov 2025)
+  SAILIND     → SAIL        (Steel Authority of India, correct symbol)
+  VBLLTD      → VBL         (Varun Beverages, correct symbol)
+  GMRINFRA    → GMRAIRPORT  (GMR Airports Infrastructure, post-demerger symbol)
+  LAURUS      → LAURUSLABS  (Laurus Labs, correct symbol)
+  KFin        → KFINTECH    (Kfin Technologies, correct symbol)
+  LEMON       → LEMONTREE   (Lemon Tree Hotels, correct symbol)
+  AAPL        removed       (Apple Inc — not an NSE stock)
+  TVSMOTORS   removed       (duplicate; TVSMOTOR already present)
+  INTERGLOBE  removed       (duplicate; INDIGO already present)
+  WHIRLPOOLINDIA removed    (duplicate; WHIRLPOOL already present)
+  INDIGO (duplicate) removed (appeared twice)
 """
 from __future__ import annotations
 
@@ -14,41 +34,41 @@ NSE500_SYMBOLS: list[str] = [
     "TECHM", "INDUSINDBK", "TATAMOTORS", "NTPC", "ONGC", "POWERGRID",
     "COALINDIA", "TATASTEEL", "HINDALCO", "GRASIM", "CIPLA",
     "DRREDDY", "DIVISLAB", "APOLLOHOSP", "BRITANNIA", "PIDILITIND",
-    "SIEMENS", "HAVELLS", "MUTHOOTFIN", "MCDOWELL-N", "VOLTAS",
+    "SIEMENS", "HAVELLS", "MUTHOOTFIN", "UNITDSPR", "VOLTAS",
     "TORNTPHARM", "LUPIN", "BIOCON", "AUROPHARMA", "ABBOTINDIA",
-    "PEL", "BERGEPAINT", "WHIRLPOOL", "POLYCAB", "ASTRAL",
-    "AAPL", "TRENT", "PAGEIND", "JUBLFOOD", "NAUKRI", "IRCTC",
+    "PIRAMALFIN", "BERGEPAINT", "WHIRLPOOL", "POLYCAB", "ASTRAL",
+    "TRENT", "PAGEIND", "JUBLFOOD", "NAUKRI", "IRCTC",
     "LTIM", "LTTS", "COFORGE", "MPHASIS", "PERSISTENT", "OFSS",
     "HDFCLIFE", "SBILIFE", "ICICIPRULI", "MAXFINSERV",
-    "BAJAJ-AUTO", "EICHERMOT", "HEROMOTOCO", "TVSMOTORS",
-    "M&M", "TVSMOTOR", "ASHOKLEY", "BALKRISIND",
+    "BAJAJ-AUTO", "EICHERMOT", "HEROMOTOCO", "TVSMOTOR",
+    "M&M", "ASHOKLEY", "BALKRISIND",
     "ADANIPORTS", "ADANIENT", "ADANIGREEN", "ADANIPOWER",
-    "JSWSTEEL", "SAILIND", "NMDC", "VEDL",
+    "JSWSTEEL", "SAIL", "NMDC", "VEDL",
     "HDFCAMC", "ICICIGI", "SBICARD",
     "RECLTD", "PFC", "IRFC", "HUDCO",
-    "INDIGO", "INTERGLOBE", "SPICEJET",
+    "INDIGO", "SPICEJET",
     "OBEROIRLTY", "DLF", "GODREJPROP", "PRESTIGE",
     "ALKEM", "IPCALAB", "NATCOPHARM", "GRANULES",
     "DEEPAKNTR", "PIIND", "ATUL", "NAVINFLUOR",
-    "CROMPTON", "BLUESTARCO", "BATAINDIA", "VBLLTD",
-    "ZOMATO", "PAYTM", "NYKAA", "POLICYBZR",
+    "CROMPTON", "BLUESTARCO", "BATAINDIA", "VBL",
+    "ETERNAL", "PAYTM", "NYKAA", "POLICYBZR",
     "DMART", "TATACONSUM", "GODREJCP",
     "GLENMARK", "TORNTPOWER", "CESC", "TATAPOWER",
     "BANKINDIA", "PNB", "CANBK", "UNIONBANK", "IOB",
     "FEDERALBNK", "IDFCFIRSTB", "BANDHANBNK", "RBLBANK",
     "MFSL", "CHOLAFIN", "M&MFIN", "SHRIRAMFIN",
-    "MOTHERSON", "BOSCHLTD", "EXIDEIND", "AMARAJABAT",
-    "CONCOR", "GMRINFRA", "IRB", "KPRMILL",
+    "MOTHERSON", "BOSCHLTD", "EXIDEIND", "ARE&M",
+    "CONCOR", "GMRAIRPORT", "IRB", "KPRMILL",
     "APLAPOLLO", "HINDCOPPER", "RATNAMANI",
-    "WHIRLPOOLINDIA", "CERA", "KAJARIACER",
+    "CERA", "KAJARIACER",
     "RELAXO", "CAMPUS", "METROBRAND",
-    "ABCAPITAL", "CANFINHOME", "REPCO", "AAVAS",
+    "ABCAPITAL", "CANFINHOME", "REPCOHOME", "AAVAS",
     "MARICO", "DABUR", "COLPAL", "EMAMILTD",
-    "KANSAINER", "INDIGO", "WABAG",
-    "SYNGENE", "LAURUS", "SUVEN", "NEULANDLAB",
+    "KANSAINER", "WABAG",
+    "SYNGENE", "LAURUSLABS", "SUVEN", "NEULANDLAB",
     "DIXON", "AMBER", "KAYNES", "SYRMA",
-    "CAMS", "KFin", "CDSL",
-    "NAVNETEDU", "PCJEWELLER", "KSCL",
+    "CAMS", "KFINTECH", "CDSL",
+    "NAVNETEDUL", "PCJEWELLER", "KSCL",
     "ELGIEQUIP", "GREAVESCOT", "THERMAX",
-    "EIHOTEL", "CHALET", "LEMON",
+    "EIHOTEL", "CHALET", "LEMONTREE",
 ]
