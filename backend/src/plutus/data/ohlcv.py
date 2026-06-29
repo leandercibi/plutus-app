@@ -106,7 +106,13 @@ class OHLCVChain:
     ) -> bool:
         if self._fallback is None:
             return False
-        overlap_start = primary_df.index.min().date() if not primary_df.empty else start
+        if "date" in primary_df.columns:
+            overlap_start = primary_df["date"].iloc[0].date() if not primary_df.empty else start
+        elif not primary_df.empty:
+            idx_min = primary_df.index.min()
+            overlap_start = idx_min.date() if hasattr(idx_min, "date") else start
+        else:
+            overlap_start = start
         try:
             fb_df = self._fallback.fetch(symbol, overlap_start, end)
         except Exception as exc:
