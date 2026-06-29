@@ -1,0 +1,19 @@
+# Production overrides — use with:
+# docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Requires: CLOUDFLARE_CREDENTIALS_FILE set in deployment/.env
+# pointing to the cloudflared tunnel credentials JSON.
+
+services:
+  frontend:
+    ports: []  # Don't bind port directly; Cloudflare tunnel handles ingress
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --config /etc/cloudflared/config.yml run
+    volumes:
+      - ./cloudflared.yml:/etc/cloudflared/config.yml:ro
+      - ${CLOUDFLARE_CREDENTIALS_FILE}:/etc/cloudflared/credentials.json:ro
+    depends_on:
+      - frontend

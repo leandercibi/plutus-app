@@ -216,3 +216,64 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+/.crew/
+/.crew
+!.crew/artifacts/
+!.crew/graphs/
+!.crew/artifacts/.gitkeep
+!.crew/graphs/.gitkeepcache/
+cache/
+
+# ── Plutus: local databases ──────────────────────────────────────────────────
+plutus.db
+plutus.db-wal
+plutus.db-shm
+*.sqlite3
+*.db
+
+# ── Plutus: internal planning & spec docs ────────────────────────────────────
+docs/
+specs/
+teach/
+
+# ── Plutus: agent / AI harness artifacts ─────────────────────────────────────
+.pi/
+pi-harness.ts
+
+# ── Plutus: local run artifacts ───────────────────────────────────────────────
+*.log
+logs/
+/tmp/
+
+# ── Plutus: backend ───────────────────────────────────────────────────────────
+backend/.venv/
+backend/__pycache__/
+backend/src/plutus.egg-info/
+backend/.pytest_cache/
+backend/.mypy_cache/
+backend/.ruff_cache/
+*.pyc
+*.pyo
+
+# ── Plutus: frontend ──────────────────────────────────────────────────────────
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# ── Plutus: Docker deployment ──────────────────────────────────────────────────
+deployment/.env
+
+# ── Plutus: Screenshots and test artifacts ─────────────────────────────────────
+screenshots/
+dashboard_test.png
+test_*.py
+
+# ── Plutus: local env & secrets (belt-and-suspenders) ────────────────────────
+.env
+.env.*
+!.env.example
+secrets.json
+
+
+!.crew/graphs/.gitkeep

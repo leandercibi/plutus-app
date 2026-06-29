@@ -1,0 +1,106 @@
+name: plutus
+
+services:
+
+  # ── PostgreSQL ─────────────────────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-plutus}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-plutus}
+      POSTGRES_DB: ${POSTGRES_DB:-plutus_db}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-plutus} -d ${POSTGRES_DB:-plutus_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── FastAPI backend ────────────────────────────────────────────────────────
+  api:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+      target: api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT:-prod}
+      DB_URL: postgresql+psycopg://${POSTGRES_USER:-plutus}:${POSTGRES_PASSWORD:-plutus}@db:5432/${POSTGRES_DB:-plutus_db}
+      API_TOKEN: ${API_TOKEN}
+      TOTAL_CAPITAL_INR: ${TOTAL_CAPITAL_INR:-100000}
+      ANGEL_API_KEY: ${ANGEL_API_KEY:-}
+      ANGEL_CLIENT_ID: ${ANGEL_CLIENT_ID:-}
+      ANGEL_PASSWORD: ${ANGEL_PASSWORD:-}
+      ANGEL_TOTP_SECRET: ${ANGEL_TOTP_SECRET:-}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      PROVIDER_PRIMARY_OHLCV: ${PROVIDER_PRIMARY_OHLCV:-yfinance}
+    volumes:
+      - logs:/app/logs
+    ports:
+      - "127.0.0.1:8007:8007"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8007/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ── APScheduler (cron jobs) ───────────────────────────────────────────────
+  scheduler:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+      target: scheduler
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT:-prod}
+      DB_URL: postgresql+psycopg://${POSTGRES_USER:-plutus}:${POSTGRES_PASSWORD:-plutus}@db:5432/${POSTGRES_DB:-plutus_db}
+      API_TOKEN: ${API_TOKEN}
+      TOTAL_CAPITAL_INR: ${TOTAL_CAPITAL_INR:-100000}
+      ANGEL_API_KEY: ${ANGEL_API_KEY:-}
+      ANGEL_CLIENT_ID: ${ANGEL_CLIENT_ID:-}
+      ANGEL_PASSWORD: ${ANGEL_PASSWORD:-}
+      ANGEL_TOTP_SECRET: ${ANGEL_TOTP_SECRET:-}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      SUNDAY_FULL_RUN_HOUR_IST: ${SUNDAY_FULL_RUN_HOUR_IST:-19}
+      MONDAY_REVALIDATION_HOUR_IST: ${MONDAY_REVALIDATION_HOUR_IST:-9}
+      MONDAY_REVALIDATION_MINUTE_IST: ${MONDAY_REVALIDATION_MINUTE_IST:-10}
+    volumes:
+      - logs:/app/logs
+
+  # ── React frontend (nginx) ────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "${FRONTEND_PORT:-80}:80"
+
+  # ── Cloudflare quick tunnel (free public HTTPS URL, no account needed) ───
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --url http://frontend:80 --no-autoupdate
+    depends_on:
+      - frontend
+
+volumes:
+  pgdata:
+  logs:

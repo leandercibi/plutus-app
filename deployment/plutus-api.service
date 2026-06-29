@@ -1,0 +1,18 @@
+# /etc/systemd/system/plutus-api.service
+[Unit]
+Description=Plutus v2 — FastAPI (uvicorn)
+After=network.target postgresql.service
+Requires=postgresql.service
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/plutus-app
+Environment=PATH=/home/ubuntu/plutus-app/.venv/bin
+EnvironmentFile=/home/ubuntu/plutus-app/.env
+ExecStart=/home/ubuntu/plutus-app/.venv/bin/uvicorn plutus.api.main:app --host 0.0.0.0 --port 8009
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
