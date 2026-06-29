@@ -11,6 +11,8 @@ from plutus.shared.regime.detector import RegimeInputs
 
 logger = logging.getLogger(__name__)
 
+# ^NSEI is a cash-market index — AngelOne doesn't expose it via candle API.
+# yfinance is intentional here.
 _NIFTY = "^NSEI"
 _LOOKBACK = 210  # need 200d DMA + buffer
 

@@ -8,6 +8,8 @@ import yfinance as yf
 
 logger = logging.getLogger(__name__)
 
+# ^INDIAVIX is a cash-market index — AngelOne doesn't expose it via candle API.
+# yfinance is intentional here.
 _NEUTRAL_VIX = 15.0
 _TICKER = "^INDIAVIX"
 

@@ -121,8 +121,8 @@ def sunday_full_run_job(
     fundamentals_provider: Any | None = None,
 ) -> JobResult:
     """Full Sunday pipeline: regime → bundles → accum screener → cull → Telegram digest."""
-    from plutus.accumulation.rs.blend import RSBlend, RSBlendResult
     from plutus.accumulation.fundamentals.scoring import FundamentalsScorer
+    from plutus.shared.rs.blend import RSBlend
     from plutus.data.providers.fundamentals_provider import FundamentalsProvider
     from plutus.db.models import AccumulationCandidate, SwingSignal
     from plutus.shared.cost_model.costs import CostModel
@@ -197,12 +197,25 @@ def sunday_full_run_job(
 
             delivery_df = _get_delivery(delivery_provider, symbol, start, today, candles)
 
+            # v4: compute the new pillars once per symbol (cheap; shared by watch + bundle paths).
+            from plutus.swing.scoring.composite_v4 import compute_v4_pillars
+
+            v4_pillars = compute_v4_pillars(
+                candles=candles,
+                delivery_df=delivery_df,
+                nifty_df=nifty_df,
+                regime_inputs=regime_inputs,
+                rs_engine=rs_blend_engine,
+                settings=settings,
+            )
+
             # — Swing path —
             symbol_signals: list[SwingSignal] = []
 
             ws = _make_watch_signal(
                 symbol, candles, verdict.label, run_id, now,
                 cost_model, calibration, settings,
+                v4_pillars=v4_pillars,
             )
             if ws is not None:
                 symbol_signals.append(ws)
@@ -234,6 +247,14 @@ def sunday_full_run_job(
 
             for sig in sub_signals:
                 try:
+                    from plutus.swing.scoring.composite_v4 import (
+                        composite_score as _composite_v4,
+                    )
+                    from plutus.swing.scoring.composite_v4 import (
+                        legacy_regime_pillar,
+                        pillar_breakdown,
+                    )
+
                     tech = technical_score(candles)
                     risk = sig.entry - sig.stop_loss
                     if risk <= 0:
@@ -254,8 +275,40 @@ def sunday_full_run_job(
                     )
                     band = calibration.confidence_band(sig.bundle, verdict.label, "")
                     exp_pillar = int(round(min(25.0, max(0.0, exp.expectancy_R / 2.0 * 25.0))))
-                    regime_pillar = _REGIME_PILLAR.get(verdict.label, 7)
-                    composite_score = tech.total + exp_pillar + regime_pillar
+
+                    if settings.enable_v4_selection:
+                        regime_pillar = v4_pillars.regime_pts
+                        rs_pts = v4_pillars.rs_pts
+                        flow_pts = v4_pillars.flow_pts
+                        composite_score = _composite_v4(
+                            technical_pts=tech.total,
+                            expectancy_pts=exp_pillar,
+                            regime_pts=regime_pillar,
+                            rs_pts=rs_pts,
+                            flow_pts=flow_pts,
+                        )
+                        breakdown = pillar_breakdown(
+                            technical_pts=tech.total,
+                            expectancy_pts=exp_pillar,
+                            regime_pts=regime_pillar,
+                            v4=v4_pillars,
+                            calibration_band=band,
+                            calibration_n=calibration.n_for(sig.bundle, verdict.label),
+                            extras={"tradable": composite_score >= settings.score_floor_actionable},
+                        )
+                    else:
+                        regime_pillar = legacy_regime_pillar(verdict.label)
+                        composite_score = tech.total + exp_pillar + regime_pillar
+                        breakdown = {
+                            "technical": tech.total,
+                            "expectancy": exp_pillar,
+                            "flow": 0,
+                            "sentiment": 0,
+                            "regime_fit": regime_pillar,
+                            "fundamentals": 0,
+                            "calibration_band": band,
+                            "calibration_n": calibration.n_for(sig.bundle, verdict.label),
+                        }
 
                     cls_out = classify(
                         score=composite_score,
@@ -280,16 +333,7 @@ def sunday_full_run_job(
                         expectancy_R=exp.expectancy_R,
                         drawn_rr=drawn_rr,
                         regime_at_signal=verdict.label,
-                        pillar_breakdown_json={
-                            "technical": tech.total,
-                            "expectancy": exp_pillar,
-                            "flow": 0,
-                            "sentiment": 0,
-                            "regime_fit": regime_pillar,
-                            "fundamentals": 0,
-                            "calibration_band": band,
-                            "calibration_n": calibration.n_for(sig.bundle, verdict.label),
-                        },
+                        pillar_breakdown_json=breakdown,
                         counterfactual_text=cls_out.counterfactual,
                         created_at=now,
                     ))
@@ -478,6 +522,8 @@ def _make_watch_signal(
     cost_model: Any,
     calibration: Any,
     settings: Settings,
+    *,
+    v4_pillars: Any | None = None,  # composite_v4.V4Pillars | None
 ) -> Any | None:
     """Light momentum pre-screen → returns an unsaved SwingSignal or None.
 
@@ -485,12 +531,23 @@ def _make_watch_signal(
       1. RSI 45-70 (building momentum, not overbought)
       2. MACD histogram positive
       3. Price within 5% of 20-day high (approaching breakout zone)
+
+    When ``v4_pillars`` is provided AND ``settings.enable_v4_selection`` is True
+    the composite score adds the RS / flow / continuous-regime pillars.
     """
     from plutus.db.models import SwingSignal
-    from plutus.swing.scoring.pillars import _rsi, _macd_components, technical_score
     from plutus.shared.scoring_inputs import ExpectancyInputs
-    from plutus.swing.scoring.expectancy import compute_expectancy
     from plutus.swing.scoring.classifier import classify
+    from plutus.swing.scoring.composite_v4 import (
+        V4Pillars,
+        legacy_regime_pillar,
+        pillar_breakdown,
+    )
+    from plutus.swing.scoring.composite_v4 import (
+        composite_score as _composite,
+    )
+    from plutus.swing.scoring.expectancy import compute_expectancy
+    from plutus.swing.scoring.pillars import _macd_components, _rsi, technical_score
 
     close = candles["close"]
     if len(close) < 21:
@@ -536,11 +593,57 @@ def _make_watch_signal(
         return None
 
     exp_pillar = int(round(min(25.0, max(0.0, exp.expectancy_R / 2.0 * 25.0))))
-    regime_pillar = {"BULL": 15, "SOFT_BULL": 10, "NEUTRAL": 7, "SOFT_BEAR": 3, "BEAR": 0}.get(regime_label, 7)
-    composite_score = tech.total + exp_pillar + regime_pillar
 
     band = calibration.confidence_band("watch_screen", regime_label, "")
-    cls_out = classify(score=composite_score, expectancy=exp, calibration_band=band, settings=settings)
+
+    if settings.enable_v4_selection and v4_pillars is not None:
+        v4: V4Pillars = v4_pillars
+        regime_pts = v4.regime_pts
+        rs_pts = v4.rs_pts
+        flow_pts = v4.flow_pts
+        composite = _composite(
+            technical_pts=tech.total,
+            expectancy_pts=exp_pillar,
+            regime_pts=regime_pts,
+            rs_pts=rs_pts,
+            flow_pts=flow_pts,
+        )
+        breakdown = pillar_breakdown(
+            technical_pts=tech.total,
+            expectancy_pts=exp_pillar,
+            regime_pts=regime_pts,
+            v4=v4,
+            calibration_band=band,
+            calibration_n=0,
+            extras={
+                "watch_criteria": {
+                    "rsi_ok": 45 <= rsi <= 70,
+                    "macd_pos": macd_pos,
+                    "near_high": near_high,
+                },
+                "tradable": composite >= settings.score_floor_actionable,
+            },
+        )
+    else:
+        regime_pts = legacy_regime_pillar(regime_label)
+        composite = tech.total + exp_pillar + regime_pts
+        breakdown = {
+            "technical": tech.total,
+            "expectancy": exp_pillar,
+            "flow": 0,
+            "sentiment": 0,
+            "regime_fit": regime_pts,
+            "fundamentals": 0,
+            "calibration_band": band,
+            "calibration_n": 0,
+            "watch_criteria": {
+                "rsi_ok": 45 <= rsi <= 70,
+                "macd_pos": macd_pos,
+                "near_high": near_high,
+            },
+        }
+
+    cls_out = classify(score=composite, expectancy=exp, calibration_band=band, settings=settings)
     if cls_out.label == "AVOID":
         return None
 
@@ -549,7 +652,7 @@ def _make_watch_signal(
         run_id=run_id,
         symbol=symbol,
         bundle="watch_screen",
-        score=composite_score,
+        score=composite,
         label=cls_out.label,
         entry=entry,
         stop_loss=stop,
@@ -558,17 +661,7 @@ def _make_watch_signal(
         expectancy_R=exp.expectancy_R,
         drawn_rr=drawn_rr,
         regime_at_signal=regime_label,
-        pillar_breakdown_json={
-            "technical": tech.total,
-            "expectancy": exp_pillar,
-            "flow": 0,
-            "sentiment": 0,
-            "regime_fit": regime_pillar,
-            "fundamentals": 0,
-            "calibration_band": band,
-            "calibration_n": 0,
-            "watch_criteria": {"rsi_ok": 45 <= rsi <= 70, "macd_pos": macd_pos, "near_high": near_high},
-        },
+        pillar_breakdown_json=breakdown,
         counterfactual_text=cls_out.counterfactual,
         created_at=now,
     )
@@ -595,7 +688,7 @@ def _run_accum_screener(
     """
     from plutus.accumulation.fundamentals.hard_avoid import FundamentalsSnapshot
     from plutus.accumulation.fundamentals.valuation import Valuation, ValuationInputs
-    from plutus.accumulation.rs.blend import RSBlendResult
+    from plutus.shared.rs.blend import RSBlendResult
     from plutus.db.models import AccumulationCandidate
 
     if len(candles) < 200:

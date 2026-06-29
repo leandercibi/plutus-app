@@ -28,6 +28,7 @@ from plutus.api.schemas.shared import (
     RunOut,
 )
 from plutus.config.settings import Settings
+from plutus.data.providers.angelone_provider import RateLimitSaturated, USER_RATE_LIMIT_TIMEOUT
 from plutus.db.models import (
     AccumulationPosition,
     CalibrationRow,
@@ -267,8 +268,11 @@ def get_chart(
                 client_id=settings.angel_client_id,
                 password=settings.angel_password,
                 totp_secret=settings.angel_totp_secret,
+                rate_limit_timeout=USER_RATE_LIMIT_TIMEOUT,
             )
             df = angel.fetch(symbol, start, end)
+        except RateLimitSaturated:
+            df = None  # fall through to yfinance — don't stall the browser
         except Exception:
             df = None
     if df is None or df.empty:
@@ -305,11 +309,14 @@ def get_chart(
                 client_id=settings.angel_client_id,
                 password=settings.angel_password,
                 totp_secret=settings.angel_totp_secret,
+                rate_limit_timeout=USER_RATE_LIMIT_TIMEOUT,
             )
             idf = angel.fetch_intraday(symbol, days=60, interval="ONE_HOUR")
             if not idf.empty:
                 idf = _add_indicators(idf)
                 intraday_bars = _df_to_bars(idf, is_intraday=True)
+        except RateLimitSaturated:
+            pass  # rate saturated — intraday_bars stays empty, daily bars still shown
         except Exception:
             pass  # graceful fallback: intraday_bars stays empty
 
@@ -479,8 +486,11 @@ def _fetch_live_prices(
                 client_id=settings.angel_client_id,
                 password=settings.angel_password,
                 totp_secret=settings.angel_totp_secret,
+                rate_limit_timeout=USER_RATE_LIMIT_TIMEOUT,
             )
             prices = provider.fetch_ltp_batch(list(symbols))
+        except RateLimitSaturated:
+            logger.warning("angel_one_batch_rate_saturated — falling back to yfinance")
         except Exception:
             logger.warning("angel_one_batch_failed, falling back to yfinance", exc_info=True)
 

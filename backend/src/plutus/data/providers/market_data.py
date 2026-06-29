@@ -6,6 +6,9 @@ import pandas as pd
 
 from plutus.data.providers.yfinance_provider import YFinanceProvider
 
+# Index tickers (^INDIAVIX, ^NSEI) are intentionally fetched via yfinance.
+# AngelOne Smart API exposes only NSE/BSE equity instruments (token-based),
+# not cash-market indices — there is no candle endpoint for these tickers.
 _VIX_TICKER = "^INDIAVIX"
 _NIFTY_TICKER = "^NSEI"
 _LOOKBACK = 252  # 1 year of daily data

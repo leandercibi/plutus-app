@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from plutus.alerts.factory import build_alert_monitor
 from plutus.alerts.formatter import AlertFormatter
 from plutus.config.settings import Settings, get_settings
+from plutus.data.ohlcv import OHLCVChain
 from plutus.data.providers.yfinance_provider import YFinanceProvider
 from plutus.db.models import Fill, SwingSignal, SwingTrade
 from plutus.db.session import session_scope
@@ -20,13 +21,30 @@ from plutus.shared.fills.types import OHLCBar, TradePlan
 logger = logging.getLogger(__name__)
 
 
-def _latest_bar(symbol: str, as_of: date) -> OHLCBar | None:
+def _build_ohlcv_chain(cfg: Settings) -> OHLCVChain:
+    """AngelOne primary → yfinance fallback for exit price lookups."""
+    if all([cfg.angel_api_key, cfg.angel_client_id, cfg.angel_password, cfg.angel_totp_secret]):
+        try:
+            from plutus.data.providers.angelone_provider import AngelOneProvider
+            primary = AngelOneProvider(
+                api_key=cfg.angel_api_key,
+                client_id=cfg.angel_client_id,
+                password=cfg.angel_password,
+                totp_secret=cfg.angel_totp_secret,
+            )
+            return OHLCVChain(primary=primary, fallback=YFinanceProvider())  # type: ignore[arg-type]
+        except Exception:
+            pass
+    return OHLCVChain(primary=YFinanceProvider(), fallback=None)  # type: ignore[arg-type]
+
+
+def _latest_bar(symbol: str, as_of: date, chain: OHLCVChain) -> OHLCBar | None:
     start = as_of - timedelta(days=10)
     try:
-        df = YFinanceProvider().fetch(symbol, start, as_of)
-        if df.empty:
+        result = chain.fetch(symbol, start, as_of)
+        if not result.success or result.df is None or result.df.empty:
             return None
-        row = df.iloc[-1]
+        row = result.df.iloc[-1]
         return OHLCBar(
             as_of=row["date"].date() if hasattr(row["date"], "date") else as_of,
             open=Decimal(str(row["open"])),
@@ -51,6 +69,7 @@ def run_exit_monitor(
     cost_model = CostModel(cfg)
     formatter = AlertFormatter()
     monitor = build_alert_monitor(cfg)
+    chain = _build_ohlcv_chain(cfg)
     counts = {"sl_breach": 0, "t1_hit": 0, "errors": 0}
 
     with session_scope() as session:
@@ -61,7 +80,7 @@ def run_exit_monitor(
         )
         for trade in open_trades:
             try:
-                _check_trade(trade, as_of, fill_policy, cost_model, formatter, monitor, session, cfg, counts)
+                _check_trade(trade, as_of, fill_policy, cost_model, formatter, monitor, session, cfg, counts, chain)
             except Exception as exc:
                 counts["errors"] += 1
                 logger.error("exit check failed", extra={"trade": trade.id, "error": str(exc)})
@@ -79,6 +98,7 @@ def _check_trade(
     session: Session,
     cfg: Settings,
     counts: dict[str, int],
+    chain: OHLCVChain,
 ) -> None:
     from typing import cast
 
@@ -90,7 +110,7 @@ def _check_trade(
     if signal is None:
         return
 
-    bar = _latest_bar(trade.symbol, as_of)
+    bar = _latest_bar(trade.symbol, as_of, chain)
     if bar is None:
         return
 

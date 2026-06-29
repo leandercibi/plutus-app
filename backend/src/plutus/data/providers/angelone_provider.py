@@ -18,7 +18,19 @@ _SESSION_LOCK = threading.Lock()
 
 _RATE_LOCK = threading.Lock()
 _LAST_CALL = [0.0]
-_MIN_INTERVAL = 1.0  # 1 request per second
+_MIN_INTERVAL = 0.34  # ~3 requests/second — AngelOne Smart API historical candle limit
+
+# How long a *user-facing* call waits to acquire the rate-limit slot before giving up.
+# Background jobs pass None (block indefinitely); API handlers pass this constant.
+USER_RATE_LIMIT_TIMEOUT = 5.0
+
+
+class RateLimitSaturated(Exception):
+    """Raised when the rate-limit slot cannot be acquired within the timeout.
+
+    Callers on the user-facing path should catch this and fall back to yfinance
+    rather than surfacing a 503 to the browser.
+    """
 
 
 def _load_instruments() -> dict[str, str]:
@@ -84,13 +96,32 @@ def _get_session(api_key: str, client_id: str, password: str, totp_secret: str, 
         return obj
 
 
-def _rate_wait() -> None:
-    with _RATE_LOCK:
-        now = time.monotonic()
-        elapsed = now - _LAST_CALL[0]
+def _rate_wait(timeout: float | None = None) -> None:
+    """Acquire the rate-limit slot, then enforce the minimum inter-call interval.
+
+    Args:
+        timeout: seconds to wait for the lock.  ``None`` (default) blocks
+            indefinitely — correct for background pipeline jobs.  Pass a
+            positive float for user-facing calls so they fail fast rather than
+            queueing behind a running pipeline sweep.
+
+    Raises:
+        RateLimitSaturated: if the lock cannot be acquired within *timeout*.
+    """
+    # Lock.acquire(timeout=-1) blocks indefinitely; any positive float limits it.
+    acquired = _RATE_LOCK.acquire(blocking=True, timeout=-1 if timeout is None else timeout)
+    if not acquired:
+        raise RateLimitSaturated(
+            f"AngelOne rate limiter saturated — slot not available within {timeout}s. "
+            "A background pipeline may be running; retry shortly."
+        )
+    try:
+        elapsed = time.monotonic() - _LAST_CALL[0]
         if elapsed < _MIN_INTERVAL:
             time.sleep(_MIN_INTERVAL - elapsed)
         _LAST_CALL[0] = time.monotonic()
+    finally:
+        _RATE_LOCK.release()
 
 
 def invalidate_session() -> None:
@@ -106,11 +137,16 @@ class AngelOneProvider:
         client_id: str,
         password: str,
         totp_secret: str,
+        *,
+        rate_limit_timeout: float | None = None,
     ) -> None:
         self._api_key = api_key
         self._client_id = client_id
         self._password = password
         self._totp_secret = totp_secret
+        # None  → block indefinitely (background pipeline jobs)
+        # float → fail fast (user-facing API handlers)
+        self._rate_limit_timeout = rate_limit_timeout
 
     def _session(self, force: bool = False):
         return _get_session(
@@ -120,7 +156,7 @@ class AngelOneProvider:
     def fetch_ltp(self, symbol: str) -> float:
         token = _resolve_token(symbol)
         for attempt in range(2):
-            _rate_wait()
+            _rate_wait(self._rate_limit_timeout)
             obj = self._session(force=(attempt == 1))
             resp = obj.ltpData("NSE", symbol.upper() + "-EQ", token)
             if not resp or resp.get("status") is False:
@@ -155,7 +191,7 @@ class AngelOneProvider:
             "todate": f"{(end + timedelta(days=1)).isoformat()} 15:30",
         }
         for attempt in range(2):
-            _rate_wait()
+            _rate_wait(self._rate_limit_timeout)
             obj = self._session(force=(attempt == 1))
             data = obj.getCandleData(params)
             if not data or not data.get("data"):

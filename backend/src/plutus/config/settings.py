@@ -82,6 +82,17 @@ class Settings(BaseSettings):
     # --- tuner (A14) ---
     auto_tune_enabled: bool = False
 
+    # --- v4 selection brain (off by default; see SWING_SYSTEM_REVIEW.md §8 items #1-#3) ---
+    # When True the watch + bundle scoring path adds three new factors:
+    #   • stock relative-strength pillar (rs_blend vs NIFTY)         0..15
+    #   • per-stock smart-money flow pillar (delivery-driven for now) 0..15
+    #   • continuous regime pillar (breadth/VIX/FII)                  0..15
+    # Composite budget becomes tech(30) + exp(25) + regime(15) + rs(15) + flow(15) = 100.
+    # When False the legacy behaviour is preserved bit-for-bit.
+    enable_v4_selection: bool = False
+    # Floor below which a signal is published but flagged tradable=False (no-edge band).
+    score_floor_actionable: int = 50
+
     # --- accumulation (A12, A13, B9) ---
     accumulation_de_max: float = 1.5
     accumulation_n_tranches: int = 5

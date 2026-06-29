@@ -20,6 +20,7 @@ from plutus.data.providers.market_data import (
     fetch_nifty_candles,
 )
 from plutus.data.providers.nse500 import NSE500_SYMBOLS
+from plutus.data.ohlcv import OHLCVChain
 from plutus.data.providers.yfinance_provider import YFinanceProvider
 from plutus.db.models import RegimeSnapshot, SwingSignal
 from plutus.db.session import session_scope
@@ -62,11 +63,30 @@ class _FallbackCalibration:
         return 0
 
 
-def _fetch_candles(symbol: str, end: date) -> pd.DataFrame | None:
+def _build_ohlcv_chain(cfg: Settings) -> OHLCVChain:
+    """AngelOne primary → yfinance fallback. Falls back silently if credentials absent."""
+    primary: object = YFinanceProvider()
+    if all([cfg.angel_api_key, cfg.angel_client_id, cfg.angel_password, cfg.angel_totp_secret]):
+        try:
+            from plutus.data.providers.angelone_provider import AngelOneProvider
+            primary = AngelOneProvider(
+                api_key=cfg.angel_api_key,
+                client_id=cfg.angel_client_id,
+                password=cfg.angel_password,
+                totp_secret=cfg.angel_totp_secret,
+            )
+        except Exception:
+            primary = YFinanceProvider()
+    return OHLCVChain(primary=primary, fallback=YFinanceProvider())  # type: ignore[arg-type]
+
+
+def _fetch_candles(symbol: str, end: date, chain: OHLCVChain) -> pd.DataFrame | None:
     start = end - timedelta(days=_LOOKBACK_DAYS)
     try:
-        df = YFinanceProvider().fetch(symbol, start, end)
-        return df if not df.empty and len(df) >= 60 else None
+        result = chain.fetch(symbol, start, end)
+        if not result.success or result.df is None or result.df.empty or len(result.df) < 60:
+            return None
+        return result.df
     except Exception as exc:
         logger.warning("candle fetch failed", extra={"symbol": symbol, "error": str(exc)})
         return None
@@ -203,17 +223,18 @@ def run_sunday_pipeline(
 
     logger.info("pipeline starting", extra={"run_id": run_id, "as_of": str(as_of)})
 
-    # 1. Nifty + VIX
+    # 1. Nifty + VIX — index tickers (^NSEI, ^INDIAVIX) via yfinance; AngelOne doesn't expose them
     try:
         nifty_df = fetch_nifty_candles(end=as_of)
         vix = fetch_india_vix(end=as_of)
     except Exception as exc:
         return PipelineResult(run_id, 0, 0, [f"nifty/vix: {exc}"])
 
-    # 2. Universe candles
+    # 2. Universe candles — AngelOne primary, yfinance fallback
+    chain = _build_ohlcv_chain(cfg)
     all_candles: dict[str, pd.DataFrame] = {}
     for sym in symbols:
-        df = _fetch_candles(sym, as_of)
+        df = _fetch_candles(sym, as_of, chain)
         if df is not None:
             all_candles[sym] = df
     if not all_candles:
