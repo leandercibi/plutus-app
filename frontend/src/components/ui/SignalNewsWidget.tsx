@@ -41,8 +41,10 @@ export function SignalNewsWidget({ data, isLoading, isError, onRefresh, isRefres
       bySector.set(key, arr)
     }
     const order = data?.sectors ?? []
+    // Keep ALL top sectors (even those with no fresh news) so the header's
+    // sector list always matches the groups shown; empty ones are labelled.
     const ordered = [
-      ...order.filter(s => bySector.has(s)),
+      ...order,
       ...[...bySector.keys()].filter(k => !order.includes(k)),
     ]
     return ordered.map(k => ({ sector: k, items: bySector.get(k) ?? [] }))
@@ -117,6 +119,11 @@ export function SignalNewsWidget({ data, isLoading, isError, onRefresh, isRefres
                 <span>{group.sector}</span>
                 <span style={{ color: 'var(--dim)' }}>{group.items.length}</span>
               </div>
+              {group.items.length === 0 && (
+                <div style={{ padding: '10px 16px', borderTop: '1px solid var(--faint)', fontSize: 12, color: 'var(--dim)' }}>
+                  No recent news.
+                </div>
+              )}
               {group.items.map((it, i) => {
                 const s = SENTIMENT[it.sentiment] ?? SENTIMENT.neutral
                 return (
