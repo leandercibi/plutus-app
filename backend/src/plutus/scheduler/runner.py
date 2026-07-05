@@ -48,7 +48,21 @@ def _build_sunday_callable(settings: Settings):  # type: ignore[no-untyped-def]
         return _log_job("sunday_full_run")
 
     def _run() -> None:
+        import uuid
+
+        from plutus.db.models import RunLogRow
+
         now = datetime.now(tz=UTC).replace(tzinfo=None)
+        run_id = f"sun-{uuid.uuid4().hex[:8]}"
+
+        # Run-log start/end each use their own transaction so the row persists
+        # in the dashboard even if the job aborts or crashes mid-run.
+        try:
+            with session_scope() as s:
+                s.add(RunLogRow(run_id=run_id, job_name="sunday_full_run", started_at=now))
+        except Exception:
+            logger.warning("run-log start write failed", exc_info=True)
+
         universe = _load_universe()
         monitor = build_alert_monitor(settings)
         formatter = AlertFormatter()
@@ -61,19 +75,37 @@ def _build_sunday_callable(settings: Settings):  # type: ignore[no-untyped-def]
             fii_dii_provider=FIIDIIStubProvider(),
         )
         init_db()
-        with session_scope() as session:
-            result = sunday_full_run_job(
-                universe=universe,
-                ohlcv_chain=ohlcv_chain,
-                delivery_provider=delivery,
-                regime_inputs=regime_inputs,
-                session=session,
-                settings=settings,
-                monitor=monitor,
-                formatter=formatter,
-                now=now,
-            )
-            logger.info("sunday_full_run finished: %s", result.kept)
+        status = "FAILED"
+        details: dict = {}
+        try:
+            with session_scope() as session:
+                result = sunday_full_run_job(
+                    universe=universe,
+                    ohlcv_chain=ohlcv_chain,
+                    delivery_provider=delivery,
+                    regime_inputs=regime_inputs,
+                    session=session,
+                    settings=settings,
+                    monitor=monitor,
+                    formatter=formatter,
+                    now=now,
+                    run_id=run_id,
+                )
+                status = result.status if result.status in ("OK", "ABORTED") else "FAILED"
+                details = {"kept": result.kept, "aborted_reason": result.aborted_reason}
+                logger.info("sunday_full_run finished: %s", result.kept)
+        except Exception:
+            logger.exception("sunday_full_run crashed")
+        finally:
+            try:
+                with session_scope() as s:
+                    row = s.get(RunLogRow, run_id)
+                    if row is not None:
+                        row.ended_at = datetime.now(tz=UTC).replace(tzinfo=None)
+                        row.status = status
+                        row.details_json = details
+            except Exception:
+                logger.warning("run-log end write failed", exc_info=True)
 
     return _run
 
