@@ -125,7 +125,6 @@ def signal_news(
     sectors = top_sectors(sector_map, settings.news_max_sectors)
 
     raw = []
-    seen_urls: set[str] = set()
     for sector in sectors:
         try:
             fetched = provider.fetch_by_industry(
@@ -137,10 +136,14 @@ def signal_news(
         except Exception:
             logger.warning("sector news fetch failed for %s", sector, exc_info=True)
             continue
+        # Keep each sector's own articles — dedup only WITHIN a sector, not across
+        # sectors. Global dedup let broad market articles claimed by the first
+        # sector starve the rest, leaving later sectors empty in the widget.
+        seen_in_sector: set[str] = set()
         for it in fetched:
-            if it.url and it.url in seen_urls:
-                continue  # same article can surface under multiple sectors
-            seen_urls.add(it.url)
+            if it.url and it.url in seen_in_sector:
+                continue
+            seen_in_sector.add(it.url)
             raw.append(it)
 
     items = [
