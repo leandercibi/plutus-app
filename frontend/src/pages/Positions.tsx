@@ -357,8 +357,6 @@ export default function Positions() {
         top: 0,
         maxHeight: 'calc(100vh - 100px)',
         overflowY: 'auto',
-        display: 'flex',
-        flexDirection: 'column',
       }}>
         <AiSummaryCard
           title="Holdings Check-In"

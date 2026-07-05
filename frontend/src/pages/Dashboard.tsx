@@ -245,17 +245,16 @@ export default function Dashboard() {
         top: 0,
         maxHeight: 'calc(100vh - 100px)',
         overflowY: 'auto',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 20,
       }}>
-        <SignalNewsWidget
-          data={news.data}
-          isLoading={news.isLoading}
-          isError={news.isError}
-          onRefresh={() => refreshNews.mutate()}
-          isRefreshing={refreshNews.isPending}
-        />
+        <div style={{ marginBottom: 20 }}>
+          <SignalNewsWidget
+            data={news.data}
+            isLoading={news.isLoading}
+            isError={news.isError}
+            onRefresh={() => refreshNews.mutate()}
+            isRefreshing={refreshNews.isPending}
+          />
+        </div>
         <AiSummaryCard
           title="This Week's Pipeline"
           subtitle="AI recap of the latest screening run"
