@@ -1,7 +1,12 @@
 import { useState } from 'react'
-import { usePortfolioSnapshot, useSwingPositions, useExitTrade, useLTP } from '../api/hooks'
+import {
+  usePortfolioSnapshot, useSwingPositions, useExitTrade, useLTP,
+  useDailyHoldingsSummary, useRefreshAiSummary,
+} from '../api/hooks'
 import { Skeleton } from '../components/ui/Skeleton'
 import { ErrorBanner } from '../components/ui/ErrorBanner'
+import { AiSummaryCard } from '../components/ui/AiSummaryCard'
+import { PositionsIcon } from '../components/icons'
 import type { PositionSnapshot, SwingTrade } from '../types/api'
 
 // ── Exit modal ────────────────────────────────────────────────────────────────
@@ -238,6 +243,9 @@ export default function Positions() {
   const trades = useSwingPositions()
   const error  = snap.error || trades.error
 
+  const daily = useDailyHoldingsSummary()
+  const refreshDaily = useRefreshAiSummary('daily')
+
   const [exitTarget, setExitTarget] = useState<{ position: PositionSnapshot; trade: SwingTrade } | null>(null)
 
   if (error) return <ErrorBanner message={String(error)} />
@@ -251,7 +259,11 @@ export default function Positions() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 1000 }}>
+    <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
+
+      {/* Main column */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16, flex: 1, minWidth: 0, maxWidth: 1000 }}>
+
       {snap.data && (
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <span style={{ fontSize: 13, color: 'var(--muted)' }}>{positions.length} open positions</span>
@@ -334,6 +346,31 @@ export default function Positions() {
           </table>
         </div>
       )}
+
+      </div>
+
+      {/* Sticky holdings AI rail — pinned while the table scrolls */}
+      <aside style={{
+        width: 340,
+        flexShrink: 0,
+        position: 'sticky',
+        top: 0,
+        maxHeight: 'calc(100vh - 100px)',
+        overflowY: 'auto',
+        display: 'flex',
+        flexDirection: 'column',
+      }}>
+        <AiSummaryCard
+          title="Holdings Check-In"
+          subtitle="Daily AI review of your open positions"
+          icon={<PositionsIcon size={13} />}
+          summary={daily.data}
+          isLoading={daily.isLoading}
+          isError={daily.isError}
+          onRefresh={() => refreshDaily.mutate()}
+          isRefreshing={refreshDaily.isPending}
+        />
+      </aside>
 
       {exitTarget && (
         <ExitModal

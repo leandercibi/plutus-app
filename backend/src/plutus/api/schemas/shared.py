@@ -132,6 +132,37 @@ class NotificationOut(BaseModel):
     created_at: datetime
 
 
+class AiSummaryOut(BaseModel):
+    kind: str
+    cache_key: str
+    content: str
+    model: str
+    created_at: datetime
+    cached: bool
+    available: bool  # False when no OPENROUTER_API_KEY is configured
+
+
+class NewsItemOut(BaseModel):
+    symbol: str
+    title: str
+    snippet: str
+    url: str
+    source: str
+    published_at: str
+    sentiment_score: float | None
+    sentiment: str  # 'positive' | 'negative' | 'neutral'
+    sector: str | None = None
+
+
+class SignalNewsOut(BaseModel):
+    items: list[NewsItemOut]
+    symbols: list[str]  # signal symbols sectors were resolved for
+    sectors: list[str]  # top sectors the news was fetched for
+    fetched_at: datetime
+    cached: bool
+    available: bool  # False when no MARKETAUX_API_KEY is configured
+
+
 class HealthOut(BaseModel):
     ok: bool
 

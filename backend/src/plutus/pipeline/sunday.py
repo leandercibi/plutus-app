@@ -13,6 +13,7 @@ from plutus.alerts.channels import AlertMessage
 from plutus.alerts.factory import build_alert_monitor
 from plutus.config.settings import Settings, get_settings
 from plutus.data.freshness import assert_freshness
+from plutus.data.ohlcv import OHLCVChain
 from plutus.data.providers.market_data import (
     compute_advance_decline,
     compute_breadth_from_candles,
@@ -20,7 +21,6 @@ from plutus.data.providers.market_data import (
     fetch_nifty_candles,
 )
 from plutus.data.providers.nse500 import NSE500_SYMBOLS
-from plutus.data.ohlcv import OHLCVChain
 from plutus.data.providers.yfinance_provider import YFinanceProvider
 from plutus.db.models import RegimeSnapshot, SwingSignal
 from plutus.db.session import session_scope
@@ -69,6 +69,7 @@ def _build_ohlcv_chain(cfg: Settings) -> OHLCVChain:
     if all([cfg.angel_api_key, cfg.angel_client_id, cfg.angel_password, cfg.angel_totp_secret]):
         try:
             from plutus.data.providers.angelone_provider import AngelOneProvider
+
             primary = AngelOneProvider(
                 api_key=cfg.angel_api_key,
                 client_id=cfg.angel_client_id,
@@ -129,30 +130,37 @@ def _detect_regime(
     return inputs, verdict.label
 
 
-def _persist_regime(session: Session, inputs: RegimeInputs, label: str, vix: float, as_of: date) -> None:
+def _persist_regime(
+    session: Session, inputs: RegimeInputs, label: str, vix: float, as_of: date
+) -> None:
     existing = session.query(RegimeSnapshot).filter_by(as_of_date=as_of).first()
     if existing:
         return
-    session.add(RegimeSnapshot(
-        as_of_date=as_of,
-        label=label,
-        nifty_close=inputs.nifty_close,
-        pct_above_50dma=inputs.pct_above_50dma,
-        pct_above_200dma=inputs.pct_above_200dma,
-        advance_decline=inputs.advance_decline,
-        india_vix=vix,
-        fii_flow_inr=Decimal("0"),
-        dii_flow_inr=Decimal("0"),
-    ))
+    session.add(
+        RegimeSnapshot(
+            as_of_date=as_of,
+            label=label,
+            nifty_close=inputs.nifty_close,
+            pct_above_50dma=inputs.pct_above_50dma,
+            pct_above_200dma=inputs.pct_above_200dma,
+            advance_decline=inputs.advance_decline,
+            india_vix=vix,
+            fii_flow_inr=Decimal("0"),
+            dii_flow_inr=Decimal("0"),
+        )
+    )
 
 
 def _build_selector_inputs(session: Session, regime: str, cfg: Settings) -> SelectorInputs:
     from plutus.db.models import BundleStatPerRegime
+
     rows = session.query(BundleStatPerRegime).filter_by(regime=regime).all()
     stats = {
         (r.bundle, r.regime): BundleRegimeStat(
-            bundle=r.bundle, regime=r.regime,
-            oos_sharpe_shrunk=r.oos_sharpe_shrunk, n_trades=r.n_trades,
+            bundle=r.bundle,
+            regime=r.regime,
+            oos_sharpe_shrunk=r.oos_sharpe_shrunk,
+            n_trades=r.n_trades,
         )
         for r in rows
     }
@@ -169,6 +177,7 @@ def _score_and_classify(
     cfg: Settings,
 ) -> dict | None:
     from plutus.shared.types import BundleSignal
+
     sig: BundleSignal = best_signal  # type: ignore[assignment]
     exp_inputs = ExpectancyInputs(
         bundle=sig.bundle,
@@ -210,17 +219,74 @@ def _score_and_classify(
     }
 
 
+def _runlog_start(run_id: str, started_at: datetime) -> None:
+    """Record a RunLogRow so the dashboard 'Recent Pipeline Runs' reflects this run."""
+    from plutus.db.models import RunLogRow
+
+    try:
+        with session_scope() as session:
+            if session.get(RunLogRow, run_id) is None:
+                session.add(
+                    RunLogRow(run_id=run_id, job_name="sunday_full_run", started_at=started_at)
+                )
+    except Exception:
+        logger.warning("run-log start write failed", exc_info=True)
+
+
+def _runlog_end(run_id: str, status: str, details: dict) -> None:
+    """Finalize the RunLogRow with status + summary details."""
+    from plutus.db.models import RunLogRow
+
+    try:
+        with session_scope() as session:
+            row = session.get(RunLogRow, run_id)
+            if row is not None:
+                row.ended_at = datetime.utcnow()
+                row.status = status
+                row.details_json = details
+    except Exception:
+        logger.warning("run-log end write failed", exc_info=True)
+
+
 def run_sunday_pipeline(
     as_of: date | None = None,
     symbols: list[str] | None = None,
     settings: Settings | None = None,
 ) -> PipelineResult:
-    """Full Sunday pipeline: fetch → regime → bundles → signals → DB → alerts."""
+    """Full Sunday pipeline: fetch → regime → bundles → signals → DB → alerts.
+
+    Wraps execution in a RunLogRow (start/end) so both manual triggers
+    (``POST /shared/runs/sunday``) and scheduled runs appear in the dashboard
+    run log.
+    """
     cfg = settings or get_settings()
     run_id = f"sun-{uuid.uuid4().hex[:8]}"
     as_of = as_of or date.today()
     symbols = symbols or NSE500_SYMBOLS
 
+    started_at = datetime.utcnow()
+    _runlog_start(run_id, started_at)
+    try:
+        result = _execute_sunday_pipeline(run_id, cfg, as_of, symbols)
+    except Exception as exc:
+        logger.exception("sunday pipeline crashed")
+        _runlog_end(run_id, "FAILED", {"error": str(exc)})
+        raise
+    _runlog_end(
+        run_id,
+        "OK" if not result.errors else "FAILED",
+        {
+            "signals_written": result.signals_written,
+            "symbols_processed": result.symbols_processed,
+            "errors": result.errors[:20],
+        },
+    )
+    return result
+
+
+def _execute_sunday_pipeline(
+    run_id: str, cfg: Settings, as_of: date, symbols: list[str]
+) -> PipelineResult:
     logger.info("pipeline starting", extra={"run_id": run_id, "as_of": str(as_of)})
 
     # 1. Nifty + VIX — index tickers (^NSEI, ^INDIAVIX) via yfinance; AngelOne doesn't expose them
@@ -264,7 +330,9 @@ def run_sunday_pipeline(
             if not sub_signals:
                 continue
             best = sub_signals[0]
-            scored = _score_and_classify(sym, candles, best, regime_label, calibration, cost_model, cfg)
+            scored = _score_and_classify(
+                sym, candles, best, regime_label, calibration, cost_model, cfg
+            )
             if scored:
                 results.append(scored)
         except Exception as exc:
@@ -276,23 +344,25 @@ def run_sunday_pipeline(
         _persist_regime(session, regime_inputs, regime_label, vix, as_of)
         for r in results:
             sig = r["signal"]
-            session.add(SwingSignal(
-                run_id=run_id,
-                symbol=sig.symbol,
-                bundle=sig.bundle,
-                score=r["score"],
-                label=r["label"],
-                entry=sig.entry,
-                stop_loss=sig.stop_loss,
-                target_1=sig.target_1,
-                target_2=sig.target_2,
-                expectancy_R=r["expectancy_R"],
-                drawn_rr=r["drawn_rr"],
-                regime_at_signal=regime_label,
-                pillar_breakdown_json=r["pillar_bd"],
-                counterfactual_text=r["counterfactual"],
-       created_at=datetime.utcnow(),
-            ))
+            session.add(
+                SwingSignal(
+                    run_id=run_id,
+                    symbol=sig.symbol,
+                    bundle=sig.bundle,
+                    score=r["score"],
+                    label=r["label"],
+                    entry=sig.entry,
+                    stop_loss=sig.stop_loss,
+                    target_1=sig.target_1,
+                    target_2=sig.target_2,
+                    expectancy_R=r["expectancy_R"],
+                    drawn_rr=r["drawn_rr"],
+                    regime_at_signal=regime_label,
+                    pillar_breakdown_json=r["pillar_bd"],
+                    counterfactual_text=r["counterfactual"],
+                    created_at=datetime.utcnow(),
+                )
+            )
 
     # 7. Telegram digest
     with session_scope() as session:
@@ -314,5 +384,7 @@ def run_sunday_pipeline(
             session=session,
         )
 
-    logger.info("pipeline done", extra={"run_id": run_id, "signals": len(results), "errors": len(errors)})
+    logger.info(
+        "pipeline done", extra={"run_id": run_id, "signals": len(results), "errors": len(errors)}
+    )
     return PipelineResult(run_id, len(results), len(all_candles), errors)

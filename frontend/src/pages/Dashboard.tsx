@@ -1,7 +1,14 @@
-import { useRegime, usePortfolioSnapshot, useRunLog } from '../api/hooks'
+import {
+  useRegime, usePortfolioSnapshot, useRunLog,
+  useWeeklyPipelineSummary, useRefreshAiSummary,
+  useSignalNews, useRefreshSignalNews, usePostmortem,
+} from '../api/hooks'
 import { StatCard } from '../components/ui/StatCard'
 import { Skeleton } from '../components/ui/Skeleton'
 import { ErrorBanner } from '../components/ui/ErrorBanner'
+import { AiSummaryCard } from '../components/ui/AiSummaryCard'
+import { SignalNewsWidget } from '../components/ui/SignalNewsWidget'
+import { StrategyIcon } from '../components/icons'
 
 const REGIME_COLOR: Record<string, string> = {
   BULL: 'var(--green)', BEAR: 'var(--red)', SIDEWAYS: 'var(--amber)',
@@ -14,6 +21,14 @@ export default function Dashboard() {
   const portfolio = usePortfolioSnapshot()
   const runLog = useRunLog(5)
 
+  const weekly = useWeeklyPipelineSummary()
+  const refreshWeekly = useRefreshAiSummary('weekly')
+
+  const news = useSignalNews()
+  const refreshNews = useRefreshSignalNews()
+
+  const postmortem = usePostmortem()
+
   if (regime.error) return <ErrorBanner message={String(regime.error)} />
 
   const r = regime.data
@@ -21,7 +36,10 @@ export default function Dashboard() {
   const color = r ? (REGIME_COLOR[r.label] ?? 'var(--dim)') : 'var(--dim)'
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 900 }}>
+    <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
+
+      {/* Main column */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 20, flex: 1, minWidth: 0, maxWidth: 900 }}>
 
       {/* Regime banner */}
       {r ? (
@@ -78,6 +96,55 @@ export default function Dashboard() {
           {[...Array(4)].map((_, i) => <Skeleton key={i} h={80} />)}
         </div>
       )}
+
+      {/* Portfolio vs Nifty 50 (latest weekly postmortem) */}
+      {postmortem.data && (() => {
+        const pm = postmortem.data
+        const delta = pm.swing_return_pct - pm.nifty_return_pct
+        const beat = delta >= 0
+        const maxAbs = Math.max(Math.abs(pm.swing_return_pct), Math.abs(pm.nifty_return_pct), 0.01)
+        const barW = (v: number) => `${Math.max(2, (Math.abs(v) / maxAbs) * 100)}%`
+        return (
+          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div>
+                <span style={{ fontSize: 13, fontWeight: 600 }}>Portfolio vs Nifty 50</span>
+                <span style={{ fontSize: 11, color: 'var(--muted)', marginLeft: 8 }}>
+                  Week ending {new Date(pm.week_ending).toLocaleDateString('en-IN')} · {pm.n_swing_trades_closed} trades
+                </span>
+              </div>
+              <span style={{
+                fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 8,
+                background: beat ? 'var(--green-bg)' : 'var(--red-bg)', color: beat ? 'var(--green)' : 'var(--red)',
+              }}>
+                {beat ? `▲ Beat by ${delta.toFixed(2)}%` : `▼ Behind by ${Math.abs(delta).toFixed(2)}%`}
+              </span>
+            </div>
+
+            {/* Plutus bar */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ width: 60, fontSize: 12, color: 'var(--muted)' }}>Plutus</span>
+              <div style={{ flex: 1, height: 8, background: 'var(--faint)', borderRadius: 4, overflow: 'hidden' }}>
+                <div style={{ width: barW(pm.swing_return_pct), height: '100%', borderRadius: 4, background: pm.swing_return_pct >= 0 ? 'var(--green)' : 'var(--red)' }} />
+              </div>
+              <span style={{ width: 58, textAlign: 'right', fontSize: 13, fontWeight: 700, color: pm.swing_return_pct >= 0 ? 'var(--green)' : 'var(--red)' }}>
+                {pm.swing_return_pct >= 0 ? '+' : ''}{pm.swing_return_pct.toFixed(2)}%
+              </span>
+            </div>
+
+            {/* Nifty 50 bar */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ width: 60, fontSize: 12, color: 'var(--muted)' }}>Nifty 50</span>
+              <div style={{ flex: 1, height: 8, background: 'var(--faint)', borderRadius: 4, overflow: 'hidden' }}>
+                <div style={{ width: barW(pm.nifty_return_pct), height: '100%', borderRadius: 4, background: 'var(--muted)' }} />
+              </div>
+              <span style={{ width: 58, textAlign: 'right', fontSize: 13, fontWeight: 700, color: 'var(--muted)' }}>
+                {pm.nifty_return_pct >= 0 ? '+' : ''}{pm.nifty_return_pct.toFixed(2)}%
+              </span>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Positions mini-table */}
       {p && p.positions.length > 0 && (
@@ -143,21 +210,63 @@ export default function Dashboard() {
                     {new Date(row.started_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}
                   </span>
                 </div>
-                <span style={{
-                  fontSize: 11,
-                  fontFamily: 'monospace',
-                  padding: '2px 8px',
-                  borderRadius: 6,
-                  background: row.status === 'ok' ? 'var(--green-bg)' : 'var(--red-bg)',
-                  color: row.status === 'ok' ? 'var(--green)' : 'var(--red)',
-                }}>
-                  {row.status?.toUpperCase() ?? 'RUNNING'}
-                </span>
+                {(() => {
+                  const st = row.status?.toUpperCase() ?? null
+                  const ok = st === 'OK'
+                  const running = st === null
+                  const bg = running ? 'var(--amber-bg)' : ok ? 'var(--green-bg)' : 'var(--red-bg)'
+                  const fg = running ? 'var(--amber)' : ok ? 'var(--green)' : 'var(--red)'
+                  return (
+                    <span style={{
+                      fontSize: 11,
+                      fontFamily: 'monospace',
+                      padding: '2px 8px',
+                      borderRadius: 6,
+                      background: bg,
+                      color: fg,
+                    }}>
+                      {st ?? 'RUNNING'}
+                    </span>
+                  )
+                })()}
               </div>
             ))}
           </div>
         )}
       </div>
+      </div>
+
+      {/* Sticky right rail — pinned while the page scrolls; the rail itself
+          scrolls (on hover) when news + summary overflow the viewport. */}
+      <aside style={{
+        width: 340,
+        flexShrink: 0,
+        position: 'sticky',
+        top: 0,
+        maxHeight: 'calc(100vh - 100px)',
+        overflowY: 'auto',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 20,
+      }}>
+        <SignalNewsWidget
+          data={news.data}
+          isLoading={news.isLoading}
+          isError={news.isError}
+          onRefresh={() => refreshNews.mutate()}
+          isRefreshing={refreshNews.isPending}
+        />
+        <AiSummaryCard
+          title="This Week's Pipeline"
+          subtitle="AI recap of the latest screening run"
+          icon={<StrategyIcon size={13} />}
+          summary={weekly.data}
+          isLoading={weekly.isLoading}
+          isError={weekly.isError}
+          onRefresh={() => refreshWeekly.mutate()}
+          isRefreshing={refreshWeekly.isPending}
+        />
+      </aside>
     </div>
   )
 }

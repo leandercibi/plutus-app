@@ -112,8 +112,29 @@ class Settings(BaseSettings):
     angel_password: str = ""
     angel_totp_secret: str = ""
 
+    # --- llm (AI summaries) ---
+    llm_model: str = "deepseek/deepseek-v4-flash"
+    llm_base_url: str = "https://openrouter.ai/api/v1"
+    llm_temperature: float = 0.4
+    # Headroom matters: reasoning models (e.g. deepseek-v4-flash) spend part of
+    # this budget "thinking", so too small a value truncates the visible answer.
+    llm_max_tokens: int = 2500
+    llm_timeout_seconds: int = 60
+
+    # --- news (Marketaux, for signal-stock insight in AI summaries) ---
+    marketaux_base_url: str = "https://api.marketaux.com/v1"
+    # NSE tickers are Yahoo-style on Marketaux: e.g. RELIANCE -> RELIANCE.NS
+    marketaux_symbol_suffix: str = ".NS"
+    news_limit: int = 3  # free tier caps articles-per-request at 3
+    news_lookback_days: int = 14
+    news_max_symbols: int = 8  # how many top signals to resolve sectors for
+    news_max_sectors: int = 3  # how many top sectors to fetch news for
+    news_country: str = "in"  # ISO country filter for sector news (India)
+    news_timeout_seconds: int = 20
+
     # --- secrets ---
     openrouter_api_key: SecretStr | None = None
+    marketaux_api_key: SecretStr | None = None
     telegram_bot_token: SecretStr | None = None
     telegram_chat_id: str | None = None
     whatsapp_api_key: SecretStr | None = None

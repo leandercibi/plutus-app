@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from fastapi import Depends, FastAPI
 
-from plutus.api import accumulation, shared, swing
+from plutus.api import accumulation, ai, shared, swing
 from plutus.api.deps import get_app_settings
 from plutus.api.errors import register_error_handlers
 from plutus.api.schemas.shared import HealthOut, VersionOut
@@ -35,6 +35,7 @@ def create_app() -> FastAPI:
     app.include_router(shared.router)
     app.include_router(swing.router)
     app.include_router(accumulation.router)
+    app.include_router(ai.router)
     return app
 
 

@@ -123,6 +123,51 @@ export interface CalibrationRow {
   last_updated: string
 }
 
+// Weekly postmortem (portfolio vs benchmarks)
+export interface Postmortem {
+  week_ending: string
+  swing_return_pct: number
+  nifty_return_pct: number
+  regime_switched_return_pct: number
+  random_baseline_return_pct: number
+  n_swing_trades_closed: number
+  drawdown_pct: number
+  report_md_path: string | null
+}
+
+// Signal-stock news (Marketaux)
+export interface NewsItem {
+  symbol: string
+  title: string
+  snippet: string
+  url: string
+  source: string
+  published_at: string
+  sentiment_score: number | null
+  sentiment: 'positive' | 'negative' | 'neutral'
+  sector: string | null
+}
+
+export interface SignalNews {
+  items: NewsItem[]
+  symbols: string[]
+  sectors: string[]
+  fetched_at: string
+  cached: boolean
+  available: boolean
+}
+
+// AI Summary
+export interface AiSummary {
+  kind: 'weekly_pipeline' | 'daily_holdings'
+  cache_key: string
+  content: string
+  model: string
+  created_at: string
+  cached: boolean
+  available: boolean
+}
+
 // Run Log
 export interface RunLogRow {
   run_id: string

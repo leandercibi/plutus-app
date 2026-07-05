@@ -3,7 +3,8 @@ import { apiClient } from './client'
 import type {
   RegimeSnapshot, PortfolioSnapshot, SwingSignal, SwingTrade,
   AccumulationCandidate, AccumulationPosition, CalibrationRow,
-  RunLogRow, ChartResponse, BacktestRequest, BacktestResult,
+  RunLogRow, ChartResponse, BacktestRequest, BacktestResult, AiSummary, SignalNews,
+  Postmortem,
 } from '../types/api'
 
 // ── Auth ─────────────────────────────────────────────
@@ -68,10 +69,74 @@ export function useRunLog(limit = 10) {
   })
 }
 
+export function usePostmortem() {
+  return useQuery({
+    queryKey: ['postmortem'],
+    queryFn: () => apiClient.get<Postmortem>('/swing/postmortem/latest').then(r => r.data).catch(() => null),
+    retry: false,
+  })
+}
+
 export function useCalibration() {
   return useQuery({
     queryKey: ['calibration'],
     queryFn: () => apiClient.get<CalibrationRow[]>('/shared/calibration').then(r => r.data),
+  })
+}
+
+// ── AI summaries ─────────────────────────────────────
+// Summaries are cached server-side (per pipeline run / per day), so the GET is
+// cheap and won't re-bill the LLM. `staleTime` is long; use the refresh
+// mutation (force=true) to regenerate on demand.
+export function useWeeklyPipelineSummary() {
+  return useQuery({
+    queryKey: ['ai', 'weekly-summary'],
+    queryFn: () => apiClient.get<AiSummary>('/ai/weekly-summary').then(r => r.data),
+    staleTime: 30 * 60_000,
+    retry: false,
+  })
+}
+
+export function useDailyHoldingsSummary() {
+  return useQuery({
+    queryKey: ['ai', 'daily-summary'],
+    queryFn: () => apiClient.get<AiSummary>('/ai/daily-summary').then(r => r.data),
+    staleTime: 30 * 60_000,
+    retry: false,
+  })
+}
+
+// Live news for the current signal-list stocks. Server caches ~15 min, so this
+// is safe to poll; refresh mutation forces a refetch.
+export function useSignalNews() {
+  return useQuery({
+    queryKey: ['ai', 'signal-news'],
+    queryFn: () => apiClient.get<SignalNews>('/ai/signal-news').then(r => r.data),
+    staleTime: 10 * 60_000,
+    refetchInterval: 15 * 60_000,
+    retry: false,
+  })
+}
+
+export function useRefreshSignalNews() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () =>
+      apiClient.get<SignalNews>('/ai/signal-news', { params: { force: true }, timeout: 30_000 })
+        .then(r => r.data),
+    onSuccess: (data) => qc.setQueryData(['ai', 'signal-news'], data),
+  })
+}
+
+export function useRefreshAiSummary(kind: 'weekly' | 'daily') {
+  const qc = useQueryClient()
+  const path = kind === 'weekly' ? '/ai/weekly-summary' : '/ai/daily-summary'
+  const key = kind === 'weekly' ? 'weekly-summary' : 'daily-summary'
+  return useMutation({
+    mutationFn: () =>
+      apiClient.get<AiSummary>(path, { params: { force: true }, timeout: 60_000 })
+        .then(r => r.data),
+    onSuccess: (data) => qc.setQueryData(['ai', key], data),
   })
 }
 

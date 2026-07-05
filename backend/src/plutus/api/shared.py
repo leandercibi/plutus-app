@@ -548,6 +548,15 @@ def get_portfolio_snapshot(
     db: Session = Depends(get_db),
     settings: Settings = Depends(get_app_settings),
 ) -> PortfolioSnapshotOut:
+    return compute_portfolio_snapshot(db, settings)
+
+
+def compute_portfolio_snapshot(db: Session, settings: Settings) -> PortfolioSnapshotOut:
+    """Live P&L across open swing + accumulation positions.
+
+    Extracted from the route handler so non-request callers (e.g. the AI
+    holdings summary) can reuse the exact same computation.
+    """
     from datetime import datetime
 
     positions: list[PositionSnapshotOut] = []

@@ -10,6 +10,7 @@ from sqlalchemy import (
     ForeignKey,
     Numeric,
     String,
+    Text,
     UniqueConstraint,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -30,9 +31,7 @@ class Universe(Base):
     symbol: Mapped[str] = mapped_column(String(32), index=True)
     as_of_date: Mapped[date] = mapped_column(index=True)
     median_traded_value_inr: Mapped[Decimal] = mapped_column(Numeric(20, 2))
-    free_float_mcap_inr: Mapped[Decimal | None] = mapped_column(
-        Numeric(24, 2), nullable=True
-    )
+    free_float_mcap_inr: Mapped[Decimal | None] = mapped_column(Numeric(24, 2), nullable=True)
     sector: Mapped[str | None] = mapped_column(String(64), nullable=True)
     is_fno_listed: Mapped[bool] = mapped_column(default=False)
     in_universe: Mapped[bool]
@@ -81,9 +80,7 @@ class BundleStatPerRegime(Base):
     ci_high: Mapped[float]
     __table_args__ = (
         UniqueConstraint("bundle", "regime", "as_of_date"),
-        CheckConstraint(
-            "oos_sharpe_shrunk BETWEEN -3 AND 3", name="ck_bundle_stat_sharpe_range"
-        ),
+        CheckConstraint("oos_sharpe_shrunk BETWEEN -3 AND 3", name="ck_bundle_stat_sharpe_range"),
     )
 
 
@@ -103,16 +100,12 @@ class CalibrationRow(Base):
     last_updated: Mapped[datetime]
     confidence_band: Mapped[str] = mapped_column(String(8))
     __table_args__ = (
-        CheckConstraint(
-            "sprt_state IN ('accept_H0','accept_H1','continue')", name="ck_calib_sprt"
-        ),
+        CheckConstraint("sprt_state IN ('accept_H0','accept_H1','continue')", name="ck_calib_sprt"),
         CheckConstraint(
             '"ci_low_R" <= "expectancy_R" AND "expectancy_R" <= "ci_high_R"',
             name="ck_calib_ci_order",
         ),
-        CheckConstraint(
-            "confidence_band IN ('low','medium','high')", name="ck_calib_band"
-        ),
+        CheckConstraint("confidence_band IN ('low','medium','high')", name="ck_calib_band"),
     )
 
 
@@ -244,9 +237,7 @@ class Tranche(Base):
     seq: Mapped[int]
     qty: Mapped[int | None] = mapped_column(nullable=True)
     atr_normalized_trigger_pct: Mapped[float]
-    filled_at_price: Mapped[Decimal | None] = mapped_column(
-        Numeric(14, 2), nullable=True
-    )
+    filled_at_price: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
     filled_at: Mapped[datetime | None] = mapped_column(nullable=True)
     thesis_revalidated: Mapped[bool] = mapped_column(default=False)
     __table_args__ = (CheckConstraint("seq BETWEEN 1 AND 5", name="ck_tranche_seq"),)
@@ -336,6 +327,42 @@ class RunLogRow(Base):
     ended_at: Mapped[datetime | None] = mapped_column(nullable=True)
     status: Mapped[str | None] = mapped_column(String(8), nullable=True)
     details_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+
+
+class AiSummary(Base):
+    """Cached LLM-generated dashboard summaries.
+
+    One row per (kind, cache_key). ``cache_key`` scopes a summary to the data it
+    describes: the pipeline run_id for the weekly summary, the IST date for the
+    daily holdings summary. A cache hit avoids re-calling the LLM on every page
+    load; the "Regenerate" button forces a refresh (upsert on the same key).
+    """
+
+    __tablename__ = "ai_summary"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    kind: Mapped[str] = mapped_column(String(32), index=True)
+    cache_key: Mapped[str] = mapped_column(String(64))
+    content: Mapped[str] = mapped_column(Text)
+    model: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime]
+    __table_args__ = (
+        UniqueConstraint("kind", "cache_key", name="uq_ai_summary_kind_key"),
+        CheckConstraint("kind IN ('weekly_pipeline','daily_holdings')", name="ck_ai_summary_kind"),
+    )
+
+
+class SectorCache(Base):
+    """Cached symbol → sector (Marketaux industry taxonomy).
+
+    Sectors are effectively static, so we resolve a symbol once (via Marketaux
+    entity search) and reuse it, keeping the news feature within the free-tier
+    request budget.
+    """
+
+    __tablename__ = "sector_cache"
+    symbol: Mapped[str] = mapped_column(String(32), primary_key=True)
+    sector: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    updated_at: Mapped[datetime]
 
 
 class WalkForwardRun(Base):
