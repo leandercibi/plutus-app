@@ -97,51 +97,53 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Portfolio vs Nifty 50 (latest weekly postmortem) */}
+      {/* Returns: realised (closed) + unrealised (open) vs Nifty 50 */}
       {postmortem.data && (() => {
         const pm = postmortem.data
+        const unreal = p?.total_pnl_pct
         const delta = pm.swing_return_pct - pm.nifty_return_pct
         const beat = delta >= 0
-        const maxAbs = Math.max(Math.abs(pm.swing_return_pct), Math.abs(pm.nifty_return_pct), 0.01)
+        const green = 'var(--green)', red = 'var(--red)', muted = 'var(--muted)'
+        const maxAbs = Math.max(
+          Math.abs(pm.swing_return_pct), Math.abs(unreal ?? 0), Math.abs(pm.nifty_return_pct), 0.01,
+        )
         const barW = (v: number) => `${Math.max(2, (Math.abs(v) / maxAbs) * 100)}%`
+        const rows: { label: string; hint: string; value: number | undefined; color: string }[] = [
+          { label: 'Realised', hint: 'closed', value: pm.swing_return_pct, color: pm.swing_return_pct >= 0 ? green : red },
+          { label: 'Unrealised', hint: 'open', value: unreal, color: unreal == null ? muted : unreal >= 0 ? green : red },
+          { label: 'Nifty 50', hint: '', value: pm.nifty_return_pct, color: muted },
+        ]
         return (
           <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
-                <span style={{ fontSize: 13, fontWeight: 600 }}>Portfolio vs Nifty 50</span>
+                <span style={{ fontSize: 13, fontWeight: 600 }}>Returns vs Nifty 50</span>
                 <span style={{ fontSize: 11, color: 'var(--muted)', marginLeft: 8 }}>
-                  Week ending {new Date(pm.week_ending).toLocaleDateString('en-IN')} · {pm.n_swing_trades_closed} trades
+                  Realised: wk ending {new Date(pm.week_ending).toLocaleDateString('en-IN')} · {pm.n_swing_trades_closed} trades
                 </span>
               </div>
               <span style={{
                 fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 8,
                 background: beat ? 'var(--green-bg)' : 'var(--red-bg)', color: beat ? 'var(--green)' : 'var(--red)',
               }}>
-                {beat ? `▲ Beat by ${delta.toFixed(2)}%` : `▼ Behind by ${Math.abs(delta).toFixed(2)}%`}
+                {beat ? '▲' : '▼'} {Math.abs(delta).toFixed(2)}% vs Nifty
               </span>
             </div>
 
-            {/* Plutus bar */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span style={{ width: 60, fontSize: 12, color: 'var(--muted)' }}>Plutus</span>
-              <div style={{ flex: 1, height: 8, background: 'var(--faint)', borderRadius: 4, overflow: 'hidden' }}>
-                <div style={{ width: barW(pm.swing_return_pct), height: '100%', borderRadius: 4, background: pm.swing_return_pct >= 0 ? 'var(--green)' : 'var(--red)' }} />
+            {rows.map(r => (
+              <div key={r.label} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ width: 78, fontSize: 12, color: 'var(--muted)' }}>
+                  {r.label}
+                  {r.hint && <span style={{ fontSize: 9, color: 'var(--dim)', marginLeft: 4 }}>{r.hint}</span>}
+                </span>
+                <div style={{ flex: 1, height: 8, background: 'var(--faint)', borderRadius: 4, overflow: 'hidden' }}>
+                  <div style={{ width: r.value == null ? '0%' : barW(r.value), height: '100%', borderRadius: 4, background: r.color }} />
+                </div>
+                <span style={{ width: 62, textAlign: 'right', fontSize: 13, fontWeight: 700, color: r.color }}>
+                  {r.value == null ? '—' : `${r.value >= 0 ? '+' : ''}${r.value.toFixed(2)}%`}
+                </span>
               </div>
-              <span style={{ width: 58, textAlign: 'right', fontSize: 13, fontWeight: 700, color: pm.swing_return_pct >= 0 ? 'var(--green)' : 'var(--red)' }}>
-                {pm.swing_return_pct >= 0 ? '+' : ''}{pm.swing_return_pct.toFixed(2)}%
-              </span>
-            </div>
-
-            {/* Nifty 50 bar */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span style={{ width: 60, fontSize: 12, color: 'var(--muted)' }}>Nifty 50</span>
-              <div style={{ flex: 1, height: 8, background: 'var(--faint)', borderRadius: 4, overflow: 'hidden' }}>
-                <div style={{ width: barW(pm.nifty_return_pct), height: '100%', borderRadius: 4, background: 'var(--muted)' }} />
-              </div>
-              <span style={{ width: 58, textAlign: 'right', fontSize: 13, fontWeight: 700, color: 'var(--muted)' }}>
-                {pm.nifty_return_pct >= 0 ? '+' : ''}{pm.nifty_return_pct.toFixed(2)}%
-              </span>
-            </div>
+            ))}
           </div>
         )
       })()}
