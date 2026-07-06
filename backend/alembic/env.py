@@ -4,14 +4,15 @@ import os
 import sys
 from logging.config import fileConfig
 
-from alembic import context
 from sqlalchemy import engine_from_config, pool
+
+from alembic import context
 
 # Ensure plutus package is importable
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from plutus.db.models import Base
 from plutus.config.settings import get_settings
+from plutus.db.models import Base
 
 config = context.config
 

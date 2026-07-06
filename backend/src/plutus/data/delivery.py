@@ -10,9 +10,7 @@ from plutus.data.base import DeliveryProvider
 _THURSDAY = 3
 
 
-def fetch_delivery(
-    symbol: str, start: date, end: date, provider: DeliveryProvider
-) -> pd.DataFrame:
+def fetch_delivery(symbol: str, start: date, end: date, provider: DeliveryProvider) -> pd.DataFrame:
     """Normalize delivery data: delivery_pct = delivery_qty / traded_qty, clipped [0,1].
 
     Missing days yield NaN delivery_pct (never silently zero).
@@ -25,9 +23,7 @@ def fetch_delivery(
     return df
 
 
-def delivery_adjusted_volume(
-    traded_qty: pd.Series, delivery_pct: pd.Series
-) -> pd.Series:
+def delivery_adjusted_volume(traded_qty: pd.Series, delivery_pct: pd.Series) -> pd.Series:
     """Replace raw volume in confirmation gates with delivery-weighted volume (A9)."""
     return traded_qty.astype(float) * delivery_pct.astype(float)
 

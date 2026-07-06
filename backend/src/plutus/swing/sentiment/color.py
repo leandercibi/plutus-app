@@ -29,9 +29,7 @@ class SentimentColorist:
     def __init__(self, client: LLMClient | None = None) -> None:
         self._client = client if client is not None else _default_client
 
-    def narrate(
-        self, headlines: list[Headline], score: SentimentScore
-    ) -> SentimentColor:
+    def narrate(self, headlines: list[Headline], score: SentimentScore) -> SentimentColor:
         prompt = self._build_prompt(headlines, score)
         narrative = self._client(prompt)
         return SentimentColor(narrative=narrative)

@@ -2,11 +2,10 @@ from __future__ import annotations
 
 import csv
 import logging
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
-
-UTC = timezone.utc
 from pathlib import Path
+from typing import Any
 
 from apscheduler.schedulers.blocking import BlockingScheduler
 
@@ -77,7 +76,7 @@ def _build_sunday_callable(settings: Settings):  # type: ignore[no-untyped-def]
         )
         init_db()
         status = "FAILED"
-        details: dict = {}
+        details: dict[str, Any] = {}
         try:
             with session_scope() as session:
                 result = sunday_full_run_job(
@@ -309,7 +308,7 @@ def _run_with_runlog(job_name: str, work) -> None:  # type: ignore[no-untyped-de
         logger.warning("run-log start failed for %s", job_name, exc_info=True)
 
     status = "FAILED"
-    details: dict = {}
+    details: dict[str, Any] = {}
     try:
         with session_scope() as session:
             result = work(session)

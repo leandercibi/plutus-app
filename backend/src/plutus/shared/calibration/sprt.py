@@ -38,9 +38,7 @@ class SPRT:
     def update(self, prior_state: SPRTState, new_outcome_R: float) -> SPRTState:
         # log-likelihood increment for a normal with known variance
         increment = (
-            (self._h1 - self._h0)
-            * (new_outcome_R - (self._h1 + self._h0) / 2.0)
-            / self._sigma2
+            (self._h1 - self._h0) * (new_outcome_R - (self._h1 + self._h0) / 2.0) / self._sigma2
         )
         llr = prior_state.llr + increment
         if llr >= self._A:

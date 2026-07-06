@@ -17,6 +17,7 @@ _LOOKBACK = 252  # 1 year of daily data
 def fetch_india_vix(end: date | None = None) -> float:
     """Latest India VIX value from yfinance."""
     from datetime import date as d_
+
     end = end or d_.today()
     start = end - timedelta(days=30)
     try:
@@ -28,6 +29,7 @@ def fetch_india_vix(end: date | None = None) -> float:
 
 def fetch_nifty_candles(lookback_days: int = _LOOKBACK, end: date | None = None) -> pd.DataFrame:
     from datetime import date as d_
+
     end = end or d_.today()
     start = end - timedelta(days=lookback_days + 50)
     return YFinanceProvider().fetch(_NIFTY_TICKER, start, end)

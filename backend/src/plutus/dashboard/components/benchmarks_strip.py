@@ -12,6 +12,4 @@ def benchmarks_strip(result: BenchmarkResult) -> None:
     cols[1].metric("Nifty B&H", f"{result.nifty_net_pct:.2f}%")
     cols[2].metric("Regime-switched", f"{result.regime_switched_net_pct:.2f}%")
     cols[3].metric("Random liquid", f"{result.random_liquid_net_pct:.2f}%")
-    st.caption(
-        f"profit factor {result.plutus_profit_factor:.2f} · n={result.plutus_n_trades}"
-    )
+    st.caption(f"profit factor {result.plutus_profit_factor:.2f} · n={result.plutus_n_trades}")

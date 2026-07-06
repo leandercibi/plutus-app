@@ -5,6 +5,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from decimal import Decimal
+from typing import Any, cast
 
 import pandas as pd
 from sqlalchemy.orm import Session
@@ -27,13 +28,14 @@ from plutus.db.session import session_scope
 from plutus.shared.calibration.protocol import CalibrationLookup
 from plutus.shared.cost_model.costs import CostModel
 from plutus.shared.regime.detector import RegimeDetector, RegimeInputs
+from plutus.shared.scoring_inputs import ExpectancyInputs
 from plutus.swing.bundles.base import BundleContext
 from plutus.swing.bundles.breakout import BreakoutBundle
 from plutus.swing.bundles.reversal import ReversalBundle
 from plutus.swing.bundles.trend import TrendBundle
 from plutus.swing.bundles.vcp import VCPBundle
 from plutus.swing.scoring.classifier import classify
-from plutus.swing.scoring.expectancy import ExpectancyInputs, compute_expectancy
+from plutus.swing.scoring.expectancy import compute_expectancy
 from plutus.swing.scoring.pillars import technical_score
 from plutus.swing.scoring.selector import BundleRegimeStat, SelectorInputs
 
@@ -175,7 +177,7 @@ def _score_and_classify(
     calibration: CalibrationLookup,
     cost_model: CostModel,
     cfg: Settings,
-) -> dict | None:
+) -> dict[str, Any] | None:
     from plutus.shared.types import BundleSignal
 
     sig: BundleSignal = best_signal  # type: ignore[assignment]
@@ -206,7 +208,7 @@ def _score_and_classify(
         "calibration_band": calibration.confidence_band(sig.bundle, regime, ""),
     }
     score_keys = ("technical", "expectancy", "flow", "sentiment", "regime_fit", "fundamentals")
-    total_score = sum(pillar_bd[k] for k in score_keys)
+    total_score = sum(cast(int, pillar_bd[k]) for k in score_keys)
     clf = classify(total_score, exp_result, pillar_bd["calibration_band"], cfg)  # type: ignore[arg-type]
     return {
         "signal": sig,
@@ -233,7 +235,7 @@ def _runlog_start(run_id: str, started_at: datetime) -> None:
         logger.warning("run-log start write failed", exc_info=True)
 
 
-def _runlog_end(run_id: str, status: str, details: dict) -> None:
+def _runlog_end(run_id: str, status: str, details: dict[str, Any]) -> None:
     """Finalize the RunLogRow with status + summary details."""
     from plutus.db.models import RunLogRow
 

@@ -13,9 +13,7 @@ def _atr(candles: pd.DataFrame, end_idx: int, period: int) -> Decimal:
     start = max(0, end_idx - period + 1)
     highs = candles["high"].iloc[start : end_idx + 1]
     lows = candles["low"].iloc[start : end_idx + 1]
-    ranges = [
-        Decimal(str(h)) - Decimal(str(lo)) for h, lo in zip(highs, lows, strict=True)
-    ]
+    ranges = [Decimal(str(h)) - Decimal(str(lo)) for h, lo in zip(highs, lows, strict=True)]
     if not ranges:
         return Decimal("0")
     return sum(ranges, Decimal("0")) / Decimal(len(ranges))

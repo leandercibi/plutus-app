@@ -82,9 +82,7 @@ def _upsert_row(
 ) -> None:
     existing = (
         session.execute(
-            select(Universe).where(
-                Universe.symbol == symbol, Universe.as_of_date == as_of
-            )
+            select(Universe).where(Universe.symbol == symbol, Universe.as_of_date == as_of)
         )
         .scalars()
         .first()

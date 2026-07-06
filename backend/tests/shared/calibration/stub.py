@@ -16,10 +16,7 @@ class StubCalibration:
     min_n_low: int = 20
 
     def hit_rate(self, bundle: str, regime: str, target_field: HitField) -> float:
-        if (
-            self.n_for(bundle, regime) < self.min_n_low
-            and (bundle, target_field) in self.pooled
-        ):
+        if self.n_for(bundle, regime) < self.min_n_low and (bundle, target_field) in self.pooled:
             return self.pooled[(bundle, target_field)]
         return self.rates.get((bundle, regime, target_field), 0.0)
 

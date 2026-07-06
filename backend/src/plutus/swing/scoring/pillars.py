@@ -60,7 +60,7 @@ def _bollinger_squeeze(close: pd.Series, lookback: int = 5) -> bool:
     if len(width) < lookback + 1:
         return False
     recent_width = float(width.iloc[-1])
-    min_width = float(width.iloc[-(lookback + 1):-1].min())
+    min_width = float(width.iloc[-(lookback + 1) : -1].min())
     expanding = recent_width > min_width * 1.1
     price = float(close.iloc[-1])
     upper = float(bb_mid.iloc[-1] + 2 * bb_std.iloc[-1])

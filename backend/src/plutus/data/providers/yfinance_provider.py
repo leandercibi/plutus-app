@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, timedelta
-from typing import ClassVar
+from typing import ClassVar, cast
 
 import pandas as pd
 
@@ -37,12 +37,12 @@ class YFinanceProvider:
             raise ValueError(f"yfinance returned empty DataFrame for {symbol}")
 
         df = raw[["Open", "High", "Low", "Close", "Volume"]].copy()
-        df.columns = ["open", "high", "low", "close", "volume"]  # type: ignore[assignment]
+        df.columns = ["open", "high", "low", "close", "volume"]
         df.index = pd.to_datetime(df.index).tz_localize(None)
         df.index.name = "date"
         df = df.reset_index()
         df["date"] = pd.to_datetime(df["date"])
-        return df.dropna(subset=["close"])
+        return cast(pd.DataFrame, df.dropna(subset=["close"]))
 
 
 class NiftyProvider:

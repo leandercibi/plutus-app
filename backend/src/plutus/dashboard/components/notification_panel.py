@@ -7,10 +7,8 @@ import streamlit as st
 from plutus.dashboard.api_client import dismiss_notification, fetch_notifications
 from plutus.dashboard.theme import (
     BORDER,
-    BUY_GREEN,
     LOSS_RED,
     PANEL,
-    SURFACE,
     SWING_ACCENT,
     TEXT_MUTED,
     TEXT_PRIMARY,
@@ -43,8 +41,10 @@ def render_notification_panel() -> None:
     notifications = fetch_notifications()
     count = len(notifications)
 
-    bell_color = LOSS_RED if any(n["severity"] == "URGENT" for n in notifications) else (
-        SWING_ACCENT if count > 0 else TEXT_MUTED
+    (
+        LOSS_RED
+        if any(n["severity"] == "URGENT" for n in notifications)
+        else (SWING_ACCENT if count > 0 else TEXT_MUTED)
     )
 
     with st.popover(f"🔔 {count}" if count > 0 else "🔔", use_container_width=False):
@@ -76,9 +76,9 @@ def _render_notification(n: dict[str, Any]) -> None:
         f'<div style="background:{bg};border-radius:6px;padding:8px 10px;'
         f'margin:6px 0;border-left:3px solid {fg};">'
         f'<div style="font-size:12px;font-weight:500;color:{fg};">'
-        f'{icon} {n["title"]}</div>'
+        f"{icon} {n['title']}</div>"
         f'<div style="font-size:11px;color:{TEXT_SECONDARY};margin-top:2px;">'
-        f'{n["body"]}</div>'
+        f"{n['body']}</div>"
         f'<div style="font-size:10px;color:{TEXT_TERTIARY};margin-top:4px;">'
         f"{created}</div>"
         f"</div>",

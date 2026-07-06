@@ -1,14 +1,14 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import date, timedelta
-from typing import Any, Callable
+from typing import Any
 
 import altair as alt
 import pandas as pd
 import streamlit as st
 
 from plutus.dashboard.theme import (
-    ACCUMULATION_ACCENT,
     BORDER,
     BUY_GREEN,
     LOSS_RED,
@@ -60,7 +60,7 @@ def _price_header(data: dict[str, Any]) -> None:
     arrow = "▲" if change >= 0 else "▼"
     st.markdown(
         f'<div style="font-size:20px;font-weight:500;color:{TEXT_PRIMARY};">'
-        f'₹{price:,.2f} '
+        f"₹{price:,.2f} "
         f'<span style="font-size:13px;color:{color};">{arrow} {change:+.2f}%</span>'
         f"</div>",
         unsafe_allow_html=True,
@@ -79,7 +79,9 @@ def _bundle_badge(bundle: str) -> None:
 
 
 def _add_bollinger_layers(
-    df: pd.DataFrame, y_scale: alt.Scale, layers: list,
+    df: pd.DataFrame,
+    y_scale: alt.Scale,
+    layers: list,
 ) -> None:
     bb_df = df[df["bb_upper"].notna()].copy()
     if bb_df.empty:
@@ -107,7 +109,9 @@ def _add_bollinger_layers(
 
 
 def _add_ema_ribbon_layers(
-    df: pd.DataFrame, y_scale: alt.Scale, layers: list,
+    df: pd.DataFrame,
+    y_scale: alt.Scale,
+    layers: list,
 ) -> None:
     ema_cols = ["ema8", "ema13", "ema21", "ema34", "ema55"]
     for i, col in enumerate(ema_cols):
@@ -123,7 +127,9 @@ def _add_ema_ribbon_layers(
 
 
 def _add_golden_cross_markers(
-    df: pd.DataFrame, y_scale: alt.Scale, layers: list,
+    df: pd.DataFrame,
+    y_scale: alt.Scale,
+    layers: list,
 ) -> None:
     cross_df = df[df["golden_cross_20_50"] == True].copy()  # noqa: E712
     if cross_df.empty:
@@ -131,8 +137,11 @@ def _add_golden_cross_markers(
     points = (
         alt.Chart(cross_df)
         .mark_point(
-            shape="triangle-up", size=120, color=_CROSS_COLOR,
-            filled=True, opacity=0.9,
+            shape="triangle-up",
+            size=120,
+            color=_CROSS_COLOR,
+            filled=True,
+            opacity=0.9,
         )
         .encode(
             x="date:T",
@@ -155,7 +164,6 @@ def render_price_chart(
 
     dur_cols = st.columns(len(_DURATION_OPTIONS))
     for i, (label, days_val) in enumerate(_DURATION_OPTIONS):
-        active = st.session_state[days_key] == days_val
         with dur_cols[i]:
             if st.button(
                 label,
@@ -231,13 +239,18 @@ def render_price_chart(
     y_max = max(all_prices) * 1.03
     y_scale = alt.Scale(domain=[y_min, y_max], zero=False, clamp=True)
 
-    x_axis = alt.X("date:T", axis=alt.Axis(format=x_fmt, labelColor=TEXT_TERTIARY, gridColor=BORDER, title=None))
-    y_axis = alt.Y("close:Q", scale=y_scale, axis=alt.Axis(labelColor=TEXT_TERTIARY, gridColor=BORDER, title=None))
+    x_axis = alt.X(
+        "date:T",
+        axis=alt.Axis(format=x_fmt, labelColor=TEXT_TERTIARY, gridColor=BORDER, title=None),
+    )
+    y_axis = alt.Y(
+        "close:Q",
+        scale=y_scale,
+        axis=alt.Axis(labelColor=TEXT_TERTIARY, gridColor=BORDER, title=None),
+    )
 
     close_line = (
-        alt.Chart(df)
-        .mark_line(strokeWidth=1.5, color=TEXT_PRIMARY)
-        .encode(x=x_axis, y=y_axis)
+        alt.Chart(df).mark_line(strokeWidth=1.5, color=TEXT_PRIMARY).encode(x=x_axis, y=y_axis)
     )
 
     layers: list = [close_line]
@@ -313,9 +326,13 @@ def render_price_chart(
     if show_bb:
         legend_parts.append(f'<span style="color:{_BB_COLOR};font-size:11px;">- - Bollinger</span>')
     if show_ribbon:
-        legend_parts.append(f'<span style="color:{_RIBBON_COLORS[0]};font-size:11px;">— EMA Ribbon</span>')
+        legend_parts.append(
+            f'<span style="color:{_RIBBON_COLORS[0]};font-size:11px;">— EMA Ribbon</span>'
+        )
     if show_cross:
-        legend_parts.append(f'<span style="color:{_CROSS_COLOR};font-size:11px;">▲ Golden Cross</span>')
+        legend_parts.append(
+            f'<span style="color:{_CROSS_COLOR};font-size:11px;">▲ Golden Cross</span>'
+        )
     st.markdown(
         f'<div style="font-size:11px;color:{TEXT_TERTIARY};margin-top:-10px;">'
         f"{' · '.join(legend_parts)}</div>",
@@ -329,8 +346,16 @@ def render_price_chart(
                 alt.Chart(macd_df)
                 .mark_line(strokeWidth=1.2, color=_MACD_COLOR)
                 .encode(
-                    x=alt.X("date:T", axis=alt.Axis(format=x_fmt, labelColor=TEXT_TERTIARY, gridColor=BORDER, title=None)),
-                    y=alt.Y("macd:Q", axis=alt.Axis(labelColor=TEXT_TERTIARY, gridColor=BORDER, title=None)),
+                    x=alt.X(
+                        "date:T",
+                        axis=alt.Axis(
+                            format=x_fmt, labelColor=TEXT_TERTIARY, gridColor=BORDER, title=None
+                        ),
+                    ),
+                    y=alt.Y(
+                        "macd:Q",
+                        axis=alt.Axis(labelColor=TEXT_TERTIARY, gridColor=BORDER, title=None),
+                    ),
                 )
             )
             signal_line = (

@@ -4,6 +4,7 @@ Moved from ``plutus.accumulation.rs.blend`` so that ``plutus.swing`` can import
 it without violating the swing-accumulation independence contract.
 ``plutus.accumulation.rs.blend`` re-exports from here for backwards compat.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -41,9 +42,7 @@ class RSBlend:
     def _relative_return(
         self, candles: pd.DataFrame, nifty_candles: pd.DataFrame, lookback: int
     ) -> float:
-        return self._period_return(candles, lookback) - self._period_return(
-            nifty_candles, lookback
-        )
+        return self._period_return(candles, lookback) - self._period_return(nifty_candles, lookback)
 
     def _period_return(self, candles: pd.DataFrame, lookback: int) -> float:
         close = candles["close"].to_numpy(dtype=float)

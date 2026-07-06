@@ -41,9 +41,7 @@ class OHLCVChain:
         self._fallback = fallback
         self._cache_dir = cache_dir
         self._cache_ttl_hours = (
-            cache_ttl_hours
-            if cache_ttl_hours is not None
-            else get_settings().cache_ttl_ohlcv_hours
+            cache_ttl_hours if cache_ttl_hours is not None else get_settings().cache_ttl_ohlcv_hours
         )
 
     def fetch(self, symbol: str, start: date, end: date) -> OHLCVResult:
@@ -87,9 +85,7 @@ class OHLCVChain:
                 extra={"symbol": symbol, "error": str(exc)},
             )
             return OHLCVResult(symbol, None, None, False, False, False)
-        logger.info(
-            "fallback used", extra={"symbol": symbol, "provider": self._fallback.name}
-        )
+        logger.info("fallback used", extra={"symbol": symbol, "provider": self._fallback.name})
         result = OHLCVResult(
             symbol=symbol,
             df=fb_df,
@@ -150,9 +146,7 @@ class OHLCVChain:
         df = pd.read_parquet(path)
         return OHLCVResult(symbol, df, self._primary.name, False, False, True)
 
-    def _write_cache(
-        self, symbol: str, start: date, end: date, result: OHLCVResult
-    ) -> None:
+    def _write_cache(self, symbol: str, start: date, end: date, result: OHLCVResult) -> None:
         path = self._cache_path(symbol, start, end)
         if path is None or result.df is None:
             return

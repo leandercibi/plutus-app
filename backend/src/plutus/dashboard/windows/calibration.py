@@ -55,12 +55,11 @@ def render(data: CalibrationView | None) -> None:
 <th style="padding: 8px 10px; text-align: right;">CI (R)</th>
 <th style="padding: 8px 10px; text-align: left;">band</th>
 <th style="padding: 8px 10px; text-align: left;">SPRT</th>
-</tr></thead><tbody>{rows_html or '<tr><td colspan=7 style="padding: 14px; text-align: center; color:'+TEXT_TERTIARY+'">no calibration data</td></tr>'}</tbody></table></div>""",
+</tr></thead><tbody>{rows_html or '<tr><td colspan=7 style="padding: 14px; text-align: center; color:' + TEXT_TERTIARY + '">no calibration data</td></tr>'}</tbody></table></div>""",
         unsafe_allow_html=True,
     )
 
     st.markdown("### Tuner proposals")
-    apply_disabled = data.auto_tune_enabled
     if not data.proposals:
         st.caption("No active proposals.")
     for i, prop in enumerate(data.proposals):
@@ -79,7 +78,9 @@ family-corrected p {prop.family_corrected_p:.3f}</div>""",
         if c1.button("Apply", key=f"apply_{i}", disabled=True):
             pass
         with c2:
-            st.caption("Manual apply not yet implemented — enable auto-tune to let the system apply approved proposals automatically.")
+            st.caption(
+                "Manual apply not yet implemented — enable auto-tune to let the system apply approved proposals automatically."
+            )
         st.markdown("</div>", unsafe_allow_html=True)
 
     st.markdown("### Applied changes history")

@@ -41,7 +41,7 @@ _TOTAL_MAX = int(_BREADTH_MAX_PTS + _VIX_MAX_PTS + _FII_MAX_PTS)  # 15
 
 @dataclass(frozen=True)
 class RegimePillar:
-    score: int               # 0..15
+    score: int  # 0..15
     breadth_pts: float
     vix_pts: float
     fii_pts: float
@@ -54,9 +54,7 @@ def _clip_unit(x: float) -> float:
 def regime_pillar_continuous(
     inputs: RegimeInputs, settings: Settings, *, max_points: int = _TOTAL_MAX
 ) -> RegimePillar:
-    breadth_frac = _clip_unit(
-        (inputs.pct_above_50dma - _BREADTH_LO) / (_BREADTH_HI - _BREADTH_LO)
-    )
+    breadth_frac = _clip_unit((inputs.pct_above_50dma - _BREADTH_LO) / (_BREADTH_HI - _BREADTH_LO))
     breadth_pts = breadth_frac * _BREADTH_MAX_PTS
 
     vix_lo = float(settings.vix_bull_max)

@@ -58,15 +58,11 @@ class PortfolioHeat:
     def evaluate(self, inputs: HeatInputs) -> HeatDecision:
         open_syms = [p.symbol for p in inputs.open_positions]
         open_risks = {p.symbol: p.risk_R for p in inputs.open_positions}
-        current = _heat_with_haircut(
-            open_syms, open_risks, inputs.pairwise_correlations
-        )
+        current = _heat_with_haircut(open_syms, open_risks, inputs.pairwise_correlations)
 
         proj_syms = [*open_syms, inputs.proposed.symbol]
         proj_risks = {**open_risks, inputs.proposed.symbol: inputs.proposed.risk_R}
-        projected = _heat_with_haircut(
-            proj_syms, proj_risks, inputs.pairwise_correlations
-        )
+        projected = _heat_with_haircut(proj_syms, proj_risks, inputs.pairwise_correlations)
 
         cap = self._settings.max_portfolio_heat_R
         allowed = projected <= cap

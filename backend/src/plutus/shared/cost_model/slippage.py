@@ -22,9 +22,7 @@ class SlippageModel:
         position_pct_of_adv = qty / adv_20d
         return self._base * (1 + position_pct_of_adv * _K_SIZE) * (1 + atr_pct * _K_VOL)
 
-    def apply_to_price(
-        self, price: Decimal, side: Literal["BUY", "SELL"], bps: float
-    ) -> Decimal:
+    def apply_to_price(self, price: Decimal, side: Literal["BUY", "SELL"], bps: float) -> Decimal:
         adjustment = price * Decimal(str(bps)) * _BPS_PER_UNIT
         if side == "BUY":
             return price + adjustment

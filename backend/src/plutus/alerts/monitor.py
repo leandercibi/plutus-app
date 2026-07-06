@@ -15,9 +15,7 @@ class AlertMonitor:
         self._channels = channels
         self._cooldown = cooldown
 
-    def emit(
-        self, message: AlertMessage, now: datetime, session: Session
-    ) -> list[AlertResult]:
+    def emit(self, message: AlertMessage, now: datetime, session: Session) -> list[AlertResult]:
         kind = message.kind
         if _is_cooldown_kind(kind) and message.symbol is not None:
             cooldown_kind: CooldownKind = kind  # type: ignore[assignment]

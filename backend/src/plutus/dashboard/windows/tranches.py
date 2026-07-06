@@ -16,7 +16,6 @@ from plutus.dashboard.theme import (
     DEAD_ZONE,
     DEAD_ZONE_BG,
     LOSS_RED,
-    TEXT_PRIMARY,
     TEXT_SECONDARY,
 )
 
@@ -65,7 +64,9 @@ Avg cost {_inr(tr.avg_cost)} · <span style="color:{pl_color}">{tr.pct_gain_loss
             with b1.popover(f"＋ T{next_seq}", use_container_width=True):
                 st.caption(f"Log tranche {next_seq} buy for **{tr.symbol}**")
                 with st.form(key=f"add_tranche_{tr.position_id}", border=False):
-                    tp = st.number_input("Buy price (₹)", min_value=0.01, step=0.05, key=f"atp_{tr.position_id}")
+                    tp = st.number_input(
+                        "Buy price (₹)", min_value=0.01, step=0.05, key=f"atp_{tr.position_id}"
+                    )
                     tq = st.number_input("Qty", min_value=1, step=1, key=f"atq_{tr.position_id}")
                     if st.form_submit_button(f"Confirm tranche {next_seq}"):
                         ok, msg = log_tranche_fill(tr.position_id, tp, int(tq))
@@ -75,7 +76,9 @@ Avg cost {_inr(tr.avg_cost)} · <span style="color:{pl_color}">{tr.pct_gain_loss
         with b2.popover("✕ Sell", use_container_width=True):
             st.caption(f"Log full exit for **{tr.symbol}**")
             with st.form(key=f"exit_{tr.position_id}", border=False):
-                ep = st.number_input("Sell price (₹)", min_value=0.01, step=0.05, key=f"esp_{tr.position_id}")
+                ep = st.number_input(
+                    "Sell price (₹)", min_value=0.01, step=0.05, key=f"esp_{tr.position_id}"
+                )
                 eq = st.number_input("Qty sold", min_value=1, step=1, key=f"esq_{tr.position_id}")
                 er = st.text_input("Reason", value="thesis broken", key=f"esr_{tr.position_id}")
                 if st.form_submit_button("Confirm sell"):
@@ -88,12 +91,14 @@ Avg cost {_inr(tr.avg_cost)} · <span style="color:{pl_color}">{tr.pct_gain_loss
                 ok, msg = resume_position(tr.position_id)
                 (st.success if ok else st.error)(msg)
         else:
-            with b3.popover("⏸ Pause", use_container_width=True):
-                with st.form(key=f"pause_form_{tr.position_id}", border=False):
-                    reason = st.text_input("Reason for pause", key=f"pausereason_{tr.position_id}")
-                    if st.form_submit_button("Confirm pause"):
-                        ok, msg = pause_position(tr.position_id, reason or "manual")
-                        (st.success if ok else st.error)(msg)
+            with (
+                b3.popover("⏸ Pause", use_container_width=True),
+                st.form(key=f"pause_form_{tr.position_id}", border=False),
+            ):
+                reason = st.text_input("Reason for pause", key=f"pausereason_{tr.position_id}")
+                if st.form_submit_button("Confirm pause"):
+                    ok, msg = pause_position(tr.position_id, reason or "manual")
+                    (st.success if ok else st.error)(msg)
 
         with b4.popover("↗ Swing", use_container_width=True):
             st.caption("Only available when regime BULL and a swing setup is forming.")

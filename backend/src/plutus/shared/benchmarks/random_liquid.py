@@ -35,9 +35,7 @@ class RandomLiquidBaseline:
         picks = self.matched_picks(plutus_trades, universe_at)
         equity = 1.0
         values = [equity]
-        index: list[date] = (
-            [plutus_trades[0].entry_date] if plutus_trades else [date.min]
-        )
+        index: list[date] = [plutus_trades[0].entry_date] if plutus_trades else [date.min]
         for trade, symbol, hold_days in picks:
             equity *= 1.0 + returns_for(symbol, trade.entry_date, hold_days)
             values.append(equity)

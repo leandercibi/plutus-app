@@ -26,9 +26,7 @@ class EarningsGate:
     the configured policy either downgrades one band or widens the stop by
     settings.earnings_stop_widen_atr * ATR. Both options are recorded."""
 
-    def __init__(
-        self, settings: Settings, policy: EarningsPolicy = "downgrade"
-    ) -> None:
+    def __init__(self, settings: Settings, policy: EarningsPolicy = "downgrade") -> None:
         self._settings = settings
         self._policy = policy
 

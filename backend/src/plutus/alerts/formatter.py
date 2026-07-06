@@ -23,9 +23,7 @@ class AlertFormatter:
             deduplication_key=f"{symbol}:ENTRY:{on.isoformat()}",
         )
 
-    def format_sl_breach(
-        self, symbol: str, fill_price: Decimal, on: date
-    ) -> AlertMessage:
+    def format_sl_breach(self, symbol: str, fill_price: Decimal, on: date) -> AlertMessage:
         return AlertMessage(
             kind="SL_BREACH",
             symbol=symbol,
@@ -65,9 +63,7 @@ class AlertFormatter:
             deduplication_key=f"{symbol}:T2_HIT:{on.isoformat()}",
         )
 
-    def format_regime_flip(
-        self, prior_label: str, current_label: str, on: date
-    ) -> AlertMessage:
+    def format_regime_flip(self, prior_label: str, current_label: str, on: date) -> AlertMessage:
         return AlertMessage(
             kind="REGIME_FLIP",
             symbol=None,

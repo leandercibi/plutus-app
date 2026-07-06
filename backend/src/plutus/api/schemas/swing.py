@@ -45,9 +45,7 @@ class SwingTradeOut(BaseModel):
     signal_id: int
     symbol: str
     bundle: str
-    state: Literal[
-        "OPEN", "T1_HIT", "CLOSED_WIN", "CLOSED_LOSS", "SCRATCHED", "EXPIRED"
-    ]
+    state: Literal["OPEN", "T1_HIT", "CLOSED_WIN", "CLOSED_LOSS", "SCRATCHED", "EXPIRED"]
     opened_at: datetime
     closed_at: datetime | None
     qty: int

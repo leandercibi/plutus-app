@@ -20,6 +20,7 @@ import json
 import logging
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Any
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
@@ -97,7 +98,7 @@ def _latest_regime(db: Session) -> RegimeSnapshot | None:
     )
 
 
-def _fetch_signal_news(settings: Settings, symbols: list[str]) -> list[dict]:
+def _fetch_signal_news(settings: Settings, symbols: list[str]) -> list[dict[str, Any]]:
     """Best-effort news + sentiment for signal symbols. Empty on no key/error."""
     from plutus.data.providers.marketaux_provider import build_news_provider
 
@@ -125,7 +126,7 @@ def _fetch_signal_news(settings: Settings, symbols: list[str]) -> list[dict]:
     ]
 
 
-def build_weekly_context(db: Session, settings: Settings) -> tuple[str, dict]:
+def build_weekly_context(db: Session, settings: Settings) -> tuple[str, dict[str, Any]]:
     """Return (cache_key, payload) describing the latest pipeline run."""
     latest_signal = (
         db.execute(select(SwingSignal).order_by(SwingSignal.created_at.desc()).limit(1))
@@ -138,7 +139,7 @@ def build_weekly_context(db: Session, settings: Settings) -> tuple[str, dict]:
         db.execute(select(RunLogRow).order_by(RunLogRow.started_at.desc()).limit(5)).scalars().all()
     )
 
-    signals_payload: list[dict] = []
+    signals_payload: list[dict[str, Any]] = []
     run_id = None
     if latest_signal is not None:
         run_id = latest_signal.run_id
@@ -211,7 +212,7 @@ def build_weekly_context(db: Session, settings: Settings) -> tuple[str, dict]:
     return cache_key, payload
 
 
-def build_daily_context(db: Session, settings: Settings) -> tuple[str, dict]:
+def build_daily_context(db: Session, settings: Settings) -> tuple[str, dict[str, Any]]:
     """Return (cache_key, payload) describing today's live holdings."""
     from plutus.api.shared import compute_portfolio_snapshot
 
@@ -350,7 +351,7 @@ def _generate(
     kind: str,
     system: str,
     cache_key: str,
-    payload: dict,
+    payload: dict[str, Any],
     force: bool,
 ) -> SummaryResult:
     client = build_llm_client(settings)

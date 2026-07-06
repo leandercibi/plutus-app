@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from plutus.alerts.channels import AlertChannel
+from plutus.alerts.channels import AlertChannel, AlertMessage, AlertResult
 from plutus.config.settings import Settings
 
 
@@ -17,5 +17,5 @@ class _WhatsAppChannel:
     def __init__(self, api_key: str) -> None:
         self._api_key = api_key
 
-    def send(self, message: object) -> object:  # pragma: no cover - optional path
+    def send(self, message: AlertMessage) -> AlertResult:  # pragma: no cover - optional path
         raise NotImplementedError("WhatsApp delivery is configured but not wired in P1")

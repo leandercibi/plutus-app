@@ -15,11 +15,7 @@ def fetch_earnings_dates(
     return provider.fetch(symbol, lookahead_days)
 
 
-def is_earnings_in_window(
-    symbol: str, start: date, end: date, provider: EarningsProvider
-) -> bool:
+def is_earnings_in_window(symbol: str, start: date, end: date, provider: EarningsProvider) -> bool:
     """True if any earnings date falls within [start, end] inclusive (B6)."""
-    dates = fetch_earnings_dates(
-        symbol, provider, lookahead_days=(end - start).days + 1
-    )
+    dates = fetch_earnings_dates(symbol, provider, lookahead_days=(end - start).days + 1)
     return any(start <= d <= end for d in dates)

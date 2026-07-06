@@ -4,18 +4,17 @@ Glue between the dashboard widget and `plutus.backtesting.runner.BacktestRunner`
 Single-symbol, single-bundle, walks every day in the requested window. Uses
 yfinance for OHLCV and SIDEWAYS as the regime stand-in when the API isn't up.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date, timedelta
-from decimal import Decimal
 
 import pandas as pd
 
 from plutus.backtesting.runner import BacktestConfig, BacktestResult, BacktestRunner
 from plutus.config.settings import get_settings
 from plutus.swing.bundles.base import BundleContext
-
 
 SINGLE_BUNDLE_FACTORIES = {
     "trend": lambda s: _import_bundle("trend", "TrendBundle", s),
@@ -136,9 +135,7 @@ def run_single_symbol_backtest(
         if is_composite:
             sub_signals = []
             for sub in sub_bundles.values():
-                ctx_sub = BundleContext(
-                    symbol=sym, regime="SIDEWAYS", delivery=delivery_slice
-                )
+                ctx_sub = BundleContext(symbol=sym, regime="SIDEWAYS", delivery=delivery_slice)
                 try:
                     sig = sub.fit_signal(sym, frame, ctx_sub)
                 except Exception:  # noqa: BLE001

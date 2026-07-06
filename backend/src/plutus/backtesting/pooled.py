@@ -79,9 +79,7 @@ class PooledStats:
             out[key] = stats_from_trades(group_trades, bundle=bundle, regime=regime)
         return out
 
-    def eligible_for_ranking(
-        self, stats: dict[object, BundleStats]
-    ) -> dict[object, BundleStats]:
+    def eligible_for_ranking(self, stats: dict[object, BundleStats]) -> dict[object, BundleStats]:
         min_n = get_settings().bundle_min_n
         return {k: s for k, s in stats.items() if s.n_trades >= min_n}
 

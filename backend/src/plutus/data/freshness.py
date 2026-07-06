@@ -13,9 +13,7 @@ class FreshnessError(RuntimeError):
     """
 
 
-def assert_freshness(
-    latest_candle_date: date, run_date: date, enabled: bool | None = None
-) -> None:
+def assert_freshness(latest_candle_date: date, run_date: date, enabled: bool | None = None) -> None:
     """Raise FreshnessError if latest_candle_date != last_trading_day(run_date).
 
     Honors settings.freshness_assert_enabled when `enabled` is not given.

@@ -17,12 +17,8 @@ def delivery(score: int) -> DeliveryTrendScore:
 
 
 def bb(score: int) -> BulkBlockScore:
-    return BulkBlockScore(
-        score_0_15=score, buyer_class="MF", net_value_inr=Decimal("10000000")
-    )
+    return BulkBlockScore(score_0_15=score, buyer_class="MF", net_value_inr=Decimal("10000000"))
 
 
 def mf(verdict: str, confidence: float) -> MFAccumulationVerdict:
-    return MFAccumulationVerdict(
-        verdict=verdict, age_days=0, confidence_after_decay=confidence
-    )
+    return MFAccumulationVerdict(verdict=verdict, age_days=0, confidence_after_decay=confidence)

@@ -46,9 +46,7 @@ class VCPBundle(BaseBundle):
             return None
 
         raw_circuit = ctx.extras.get("circuit_bars", set())
-        circuit_bars: set[int] = (
-            set(raw_circuit) if isinstance(raw_circuit, (set, list)) else set()
-        )
+        circuit_bars: set[int] = set(raw_circuit) if isinstance(raw_circuit, (set, list)) else set()
 
         # the pre-breakout history: all bars except the last (breakout) bar
         history = candles.iloc[:-1].reset_index(drop=True)
@@ -74,12 +72,10 @@ class VCPBundle(BaseBundle):
         recent_ranges = ranges[-_MIN_CONTRACTIONS:]
         recent_volumes = volumes[-_MIN_CONTRACTIONS:]
         amplitude_decreasing = all(
-            recent_ranges[i] > recent_ranges[i + 1]
-            for i in range(len(recent_ranges) - 1)
+            recent_ranges[i] > recent_ranges[i + 1] for i in range(len(recent_ranges) - 1)
         )
         volume_declining = all(
-            recent_volumes[i] > recent_volumes[i + 1]
-            for i in range(len(recent_volumes) - 1)
+            recent_volumes[i] > recent_volumes[i + 1] for i in range(len(recent_volumes) - 1)
         )
         if not (amplitude_decreasing and volume_declining):
             return None
@@ -96,9 +92,7 @@ class VCPBundle(BaseBundle):
             return None
 
         entry = Decimal(str(price))
-        stop = Decimal(str(final_contraction_high)) - _STOP_ATR_BUFFER * Decimal(
-            str(last_atr)
-        )
+        stop = Decimal(str(final_contraction_high)) - _STOP_ATR_BUFFER * Decimal(str(last_atr))
         risk = entry - stop
         target_1 = entry + _T1_RR * risk
         target_2 = entry + _T2_RR * risk

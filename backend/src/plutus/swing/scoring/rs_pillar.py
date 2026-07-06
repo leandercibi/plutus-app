@@ -23,8 +23,8 @@ _ANCHOR_LO = -0.10
 
 @dataclass(frozen=True)
 class RSPillar:
-    score: int                 # 0..15
-    blended: float             # raw blended relative return
+    score: int  # 0..15
+    blended: float  # raw blended relative return
     components: tuple[float, float, float]  # (rs_30, rs_90, rs_180)
 
 

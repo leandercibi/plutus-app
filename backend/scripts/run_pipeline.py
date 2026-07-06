@@ -7,13 +7,14 @@ Usage:
 If --symbols is not given, reads scripts/nse500.csv (NSE-500 universe).
 Writes swing signals to the DB; prints a summary.
 """
+
 from __future__ import annotations
 
 import argparse
 import csv
 import logging
 import sys
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
@@ -47,9 +48,9 @@ def main() -> None:
     parser.add_argument("--run-id", help="Caller-supplied run id (else auto-generated)")
     args = parser.parse_args()
 
+    from plutus.config.settings import get_settings
     from plutus.db.init_db import init_db
     from plutus.db.session import session_scope
-    from plutus.config.settings import get_settings
 
     init_db()
     settings = get_settings()
@@ -59,23 +60,22 @@ def main() -> None:
 
     # Import providers (built by workers)
     try:
-        from plutus.data.providers.yfinance_provider import YFinanceProvider
-        from plutus.data.providers.delivery_stub import DeliveryStubProvider
-        from plutus.data.providers.vix_provider import VixYFinanceProvider
         from plutus.data.providers.breadth_provider import BreadthYFinanceProvider
+        from plutus.data.providers.delivery_stub import DeliveryStubProvider
         from plutus.data.providers.fii_dii_provider import FIIDIIStubProvider
         from plutus.data.providers.regime_builder import build_regime_inputs
+        from plutus.data.providers.vix_provider import VixYFinanceProvider
+        from plutus.data.providers.yfinance_provider import YFinanceProvider
     except ImportError as e:
         logger.error("Provider not yet available: %s", e)
         logger.error("Run the workers first or wait for them to complete.")
         sys.exit(1)
 
-    from plutus.data.ohlcv import OHLCVChain
-    from plutus.shared.regime.detector import RegimeDetector
-    from plutus.shared.regime.snapshot import save_snapshot
     from plutus.alerts.factory import build_alert_monitor
     from plutus.alerts.formatter import AlertFormatter
+    from plutus.data.ohlcv import OHLCVChain
     from plutus.scheduler.jobs import sunday_full_run_job
+    from plutus.shared.regime.detector import RegimeDetector
 
     ohlcv_chain = OHLCVChain(YFinanceProvider(), fallback=None)
     delivery_provider = DeliveryStubProvider()
@@ -93,12 +93,14 @@ def main() -> None:
 
     if args.dry_run:
         from plutus.shared.regime.detector import RegimeDetector
+
         verdict = RegimeDetector(settings).classify(regime_inputs)
         logger.info("Dry run — regime=%s, skipping DB writes", verdict.label)
         return
 
-    from plutus.scheduler.run_log import RunLog
     import uuid as _uuid
+
+    from plutus.scheduler.run_log import RunLog
 
     run_id = args.run_id or f"sun-{_uuid.uuid4().hex[:8]}"
     started = datetime.utcnow()
@@ -131,8 +133,9 @@ def main() -> None:
         aborted_reason = str(exc)
 
     # Count THIS run's signals (not the latest run_id in DB).
-    from plutus.db.session import session_scope as _ss
     from plutus.db.models import SwingSignal as _SS
+    from plutus.db.session import session_scope as _ss
+
     n = 0
     labels: set[str] = set()
     with _ss() as _s:

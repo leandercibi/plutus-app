@@ -34,9 +34,7 @@ def _source_domain(source: str) -> str:
 
 
 class HardKillEvaluator:
-    def __init__(
-        self, settings: Settings, resolver: EntityResolver | None = None
-    ) -> None:
+    def __init__(self, settings: Settings, resolver: EntityResolver | None = None) -> None:
         self._settings = settings
         self._resolver = resolver if resolver is not None else EntityResolver()
 
@@ -44,9 +42,7 @@ class HardKillEvaluator:
         self, headlines: list[Headline], today_candles: pd.DataFrame, symbol: str
     ) -> HardKillVerdict:
         high_conf = [
-            hl
-            for hl in headlines
-            if self._resolver.resolve(hl, symbol).confidence == "high"
+            hl for hl in headlines if self._resolver.resolve(hl, symbol).confidence == "high"
         ]
 
         # (3) structural event class — provider-verified, entity-matched

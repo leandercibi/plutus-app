@@ -39,9 +39,6 @@ def probability_weighted_target(
         weighted_sum += weight * target
         weight_total += weight
     if weight_total == 0:
-        equal = [
-            s.target_1 if target_field == "target_1" else s.target_2
-            for s in sub_signals
-        ]
+        equal = [s.target_1 if target_field == "target_1" else s.target_2 for s in sub_signals]
         return sum(equal, Decimal("0")) / Decimal(len(equal))
     return weighted_sum / weight_total

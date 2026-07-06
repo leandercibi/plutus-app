@@ -15,8 +15,6 @@ from plutus.dashboard.theme import (
     LOSS_RED,
     LOSS_RED_BG,
     PANEL,
-    SURFACE,
-    SWING_ACCENT,
     TEXT_PRIMARY,
     TEXT_SECONDARY,
     TEXT_TERTIARY,
@@ -89,9 +87,7 @@ T2 <b style="color:{TEXT_PRIMARY}">{_inr(sig.target_2)}</b></div>""",
     if sig.adv_use_pct > 0:
         chips.append(_chip(f"ADV use {sig.adv_use_pct:.1f}%", TEXT_SECONDARY, PANEL))
     if sig.circuit_hits_90d > 0:
-        chips.append(
-            _chip(f"⚠ circuit hits {sig.circuit_hits_90d} (90d)", LOSS_RED, LOSS_RED_BG)
-        )
+        chips.append(_chip(f"⚠ circuit hits {sig.circuit_hits_90d} (90d)", LOSS_RED, LOSS_RED_BG))
     if sig.earnings_in_window:
         chips.append(_chip("⚠ earnings in window", LOSS_RED, LOSS_RED_BG))
     if sig.sector_heat > 0:

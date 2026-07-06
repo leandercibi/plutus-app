@@ -5,7 +5,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from decimal import Decimal
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 import numpy as np
 import pandas as pd
@@ -17,6 +17,7 @@ from plutus.alerts.formatter import AlertFormatter
 from plutus.alerts.monitor import AlertMonitor
 from plutus.config.settings import Settings
 from plutus.data.freshness import FreshnessError, assert_freshness
+from plutus.shared.types import BundleSignal
 from plutus.swing.entries.monday_revalidation import MondayRevalidation
 
 if TYPE_CHECKING:
@@ -57,7 +58,7 @@ def monday_revalidation_job(
     killed: list[tuple[str, str]] = []
     for c in candidates:
         outcome = reval.reevaluate(
-            sunday_signal=_StubSignal(c.symbol, c.entry),
+            sunday_signal=cast(BundleSignal, _StubSignal(c.symbol, c.entry)),
             monday_open=c.monday_open,
             atr=c.atr,
             hard_kill_fires=c.hard_kill_fires,
@@ -122,12 +123,12 @@ def sunday_full_run_job(
 ) -> JobResult:
     """Full Sunday pipeline: regime → bundles → accum screener → cull → Telegram digest."""
     from plutus.accumulation.fundamentals.scoring import FundamentalsScorer
-    from plutus.shared.rs.blend import RSBlend
     from plutus.data.providers.fundamentals_provider import FundamentalsProvider
     from plutus.db.models import AccumulationCandidate, SwingSignal
     from plutus.shared.cost_model.costs import CostModel
     from plutus.shared.regime.detector import RegimeDetector
     from plutus.shared.regime.snapshot import save_snapshot
+    from plutus.shared.rs.blend import RSBlend
     from plutus.shared.scoring_inputs import ExpectancyInputs
     from plutus.swing.bundles.base import BundleContext
     from plutus.swing.bundles.breakout import BreakoutBundle
@@ -163,7 +164,11 @@ def sunday_full_run_job(
     ]
 
     _REGIME_PILLAR: dict[str, int] = {
-        "BULL": 15, "SOFT_BULL": 10, "NEUTRAL": 7, "SOFT_BEAR": 3, "BEAR": 0
+        "BULL": 15,
+        "SOFT_BULL": 10,
+        "NEUTRAL": 7,
+        "SOFT_BEAR": 3,
+        "BEAR": 0,
     }
 
     # 2. Pre-fetch Nifty candles once for RSBlend
@@ -213,8 +218,14 @@ def sunday_full_run_job(
             symbol_signals: list[SwingSignal] = []
 
             ws = _make_watch_signal(
-                symbol, candles, verdict.label, run_id, now,
-                cost_model, calibration, settings,
+                symbol,
+                candles,
+                verdict.label,
+                run_id,
+                now,
+                cost_model,
+                calibration,
+                settings,
                 v4_pillars=v4_pillars,
             )
             if ws is not None:
@@ -320,23 +331,25 @@ def sunday_full_run_job(
                         continue
 
                     drawn_rr = float((sig.target_1 - sig.entry) / risk)
-                    symbol_signals.append(SwingSignal(
-                        run_id=run_id,
-                        symbol=sig.symbol,
-                        bundle=sig.bundle,
-                        score=composite_score,
-                        label=cls_out.label,
-                        entry=sig.entry,
-                        stop_loss=sig.stop_loss,
-                        target_1=sig.target_1,
-                        target_2=sig.target_2,
-                        expectancy_R=exp.expectancy_R,
-                        drawn_rr=drawn_rr,
-                        regime_at_signal=verdict.label,
-                        pillar_breakdown_json=breakdown,
-                        counterfactual_text=cls_out.counterfactual,
-                        created_at=now,
-                    ))
+                    symbol_signals.append(
+                        SwingSignal(
+                            run_id=run_id,
+                            symbol=sig.symbol,
+                            bundle=sig.bundle,
+                            score=composite_score,
+                            label=cls_out.label,
+                            entry=sig.entry,
+                            stop_loss=sig.stop_loss,
+                            target_1=sig.target_1,
+                            target_2=sig.target_2,
+                            expectancy_R=exp.expectancy_R,
+                            drawn_rr=drawn_rr,
+                            regime_at_signal=verdict.label,
+                            pillar_breakdown_json=breakdown,
+                            counterfactual_text=cls_out.counterfactual,
+                            created_at=now,
+                        )
+                    )
                 except Exception as exc:
                     logger.error("signal scoring failed for %s/%s: %s", symbol, sig.bundle, exc)
 
@@ -372,8 +385,8 @@ def sunday_full_run_job(
     top_swing = sorted(pending_signals, key=lambda s: s.score, reverse=True)[:15]
     top_accum = sorted(pending_accum, key=lambda c: c.score, reverse=True)[:10]
 
-    for sig in top_swing:
-        session.add(sig)
+    for swing_sig in top_swing:
+        session.add(swing_sig)
     for cand in top_accum:
         session.add(cand)
 
@@ -422,9 +435,9 @@ def daily_exit_monitor_job(
     from plutus.db.models import SwingSignal, SwingTrade
 
     open_trades = (
-        session.execute(
-            select(SwingTrade).where(SwingTrade.state.in_(["OPEN", "T1_HIT"]))
-        ).scalars().all()
+        session.execute(select(SwingTrade).where(SwingTrade.state.in_(["OPEN", "T1_HIT"])))
+        .scalars()
+        .all()
     )
     if not open_trades:
         return JobResult("daily_exit_monitor", "OK")
@@ -458,18 +471,18 @@ def daily_exit_monitor_job(
                 trade.state = "CLOSED_LOSS"
                 trade.closed_at = now
                 trade.exit_reason = "SL_BREACH"
-                trade.realized_R = float(
-                    (price - signal.entry) / (signal.entry - signal.stop_loss)
-                )
+                trade.realized_R = float((price - signal.entry) / (signal.entry - signal.stop_loss))
                 monitor.emit(
                     formatter.format_sl_breach(trade.symbol, price, now.date()),
-                    now, session,
+                    now,
+                    session,
                 )
             elif price >= signal.target_1 and trade.state == "OPEN":
                 trade.state = "T1_HIT"
                 monitor.emit(
                     formatter.format_t1_hit(trade.symbol, now.date()),
-                    now, session,
+                    now,
+                    session,
                 )
         except Exception as exc:
             logger.error("exit check failed", extra={"symbol": trade.symbol, "error": str(exc)})
@@ -486,7 +499,9 @@ class _FallbackCalibration:
     def hit_rate(self, bundle: str, regime: str, target_field: str) -> float:
         return self._POOLED.get(target_field, 0.5)
 
-    def confidence_band(self, bundle: str, regime: str, score_bucket: str) -> str:
+    def confidence_band(
+        self, bundle: str, regime: str, score_bucket: str
+    ) -> Literal["low", "medium", "high"]:
         return "low"
 
     def n_for(self, bundle: str, regime: str) -> int:
@@ -502,15 +517,17 @@ def _get_delivery(
 ) -> pd.DataFrame:
     if provider is not None:
         try:
-            return provider.fetch(symbol, start, end)
+            return cast(pd.DataFrame, provider.fetch(symbol, start, end))
         except Exception:
             pass
     n = len(candles)
-    return pd.DataFrame({
-        "delivery_qty": np.zeros(n),
-        "traded_qty": np.ones(n),
-        "delivery_pct": np.zeros(n),
-    })
+    return pd.DataFrame(
+        {
+            "delivery_qty": np.zeros(n),
+            "traded_qty": np.ones(n),
+            "delivery_pct": np.zeros(n),
+        }
+    )
 
 
 def _make_watch_signal(
@@ -564,6 +581,7 @@ def _make_watch_signal(
         return None
 
     from plutus.swing.bundles._indicators import atr as _atr
+
     atr_series = _atr(candles, 14)
     last_atr = float(atr_series.iloc[-1]) if not pd.isna(atr_series.iloc[-1]) else price * 0.02
     entry = Decimal(str(round(price, 2)))
@@ -688,8 +706,8 @@ def _run_accum_screener(
     """
     from plutus.accumulation.fundamentals.hard_avoid import FundamentalsSnapshot
     from plutus.accumulation.fundamentals.valuation import Valuation, ValuationInputs
-    from plutus.shared.rs.blend import RSBlendResult
     from plutus.db.models import AccumulationCandidate
+    from plutus.shared.rs.blend import RSBlendResult
 
     if len(candles) < 200:
         return None
@@ -838,9 +856,7 @@ def _update_calibration(session: Session, settings: Settings, now: datetime) -> 
         else:
             sprt = "continue"
 
-        existing = (
-            session.query(CalibrationRow).filter_by(bucket=bucket, regime=regime).first()
-        )
+        existing = session.query(CalibrationRow).filter_by(bucket=bucket, regime=regime).first()
         if existing is not None:
             existing.n_closed = n
             existing.win_rate = win_rate
@@ -851,20 +867,24 @@ def _update_calibration(session: Session, settings: Settings, now: datetime) -> 
             existing.confidence_band = band
             existing.last_updated = now
         else:
-            session.add(CalibrationRow(
-                bucket=bucket,
-                regime=regime,
-                n_closed=n,
-                win_rate=win_rate,
-                expectancy_R=exp_R,
-                ci_low_R=ci_low_R,
-                ci_high_R=ci_high_R,
-                sprt_state=sprt,
-                confidence_band=band,
-                last_updated=now,
-            ))
+            session.add(
+                CalibrationRow(
+                    bucket=bucket,
+                    regime=regime,
+                    n_closed=n,
+                    win_rate=win_rate,
+                    expectancy_R=exp_R,
+                    ci_low_R=ci_low_R,
+                    ci_high_R=ci_high_R,
+                    sprt_state=sprt,
+                    confidence_band=band,
+                    last_updated=now,
+                )
+            )
 
-    logger.info("Calibration updated: %d buckets from %d closed trades", len(groups), len(closed_rows))
+    logger.info(
+        "Calibration updated: %d buckets from %d closed trades", len(groups), len(closed_rows)
+    )
 
 
 @dataclass(frozen=True)
@@ -877,11 +897,10 @@ class _StubSignal:
 # Full pipeline jobs called by scheduler/runner.py
 # ---------------------------------------------------------------------------
 
+
 @dataclass(frozen=True)
 class _SundayResult:
     run_id: str
     signals_written: int
     kept: list[str] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
-
-

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from datetime import date, timedelta
+from typing import cast
 
 import pandas as pd
 import yfinance as yf
@@ -17,15 +18,16 @@ _TICKER = "^INDIAVIX"
 class VixYFinanceProvider:
     def fetch(self, start: date, end: date) -> pd.Series:
         try:
-            df = yf.download(_TICKER, start=start, end=end + timedelta(days=1),
-                             auto_adjust=True, progress=False)
+            df = yf.download(
+                _TICKER, start=start, end=end + timedelta(days=1), auto_adjust=True, progress=False
+            )
             if df.empty:
                 raise ValueError("empty")
             close = df["Close"]
             if hasattr(close, "squeeze"):
                 close = close.squeeze()
             close.index = pd.to_datetime(close.index).normalize()
-            return close.sort_index().dropna()
+            return cast(pd.Series, close.sort_index().dropna())
         except Exception as exc:
             logger.warning("VIX fetch failed (%s); using neutral %.1f", exc, _NEUTRAL_VIX)
             idx = pd.date_range(start, end, freq="B")

@@ -9,9 +9,7 @@ import pandas as pd
 logger = logging.getLogger(__name__)
 
 _CLOSE_DIFF_WARN_PCT = 1.0
-_SPLIT_RATIO_DISAGREEMENT = (
-    0.30  # 30% gap in day-over-day ratio implies a split mismatch
-)
+_SPLIT_RATIO_DISAGREEMENT = 0.30  # 30% gap in day-over-day ratio implies a split mismatch
 
 
 @dataclass(frozen=True)

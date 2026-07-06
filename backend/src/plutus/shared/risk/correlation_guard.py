@@ -49,7 +49,6 @@ class CorrelationGuard:
         reasons: list[str] = []
         if not allowed:
             reasons.append(
-                f"correlation {max_corr:.2f} with {worst_symbol} exceeds "
-                f"max {threshold:.2f}"
+                f"correlation {max_corr:.2f} with {worst_symbol} exceeds max {threshold:.2f}"
             )
         return GuardDecision(allowed=allowed, max_correlation=max_corr, reasons=reasons)

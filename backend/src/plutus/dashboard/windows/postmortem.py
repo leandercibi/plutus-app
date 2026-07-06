@@ -36,6 +36,4 @@ def render(data: PostmortemView) -> None:
     )
 
     if data.slippage_divergence_bps is not None:
-        st.markdown(
-            f"Slippage divergence (mock vs real): {data.slippage_divergence_bps:.1f} bps"
-        )
+        st.markdown(f"Slippage divergence (mock vs real): {data.slippage_divergence_bps:.1f} bps")

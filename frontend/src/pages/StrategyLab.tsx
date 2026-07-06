@@ -370,7 +370,8 @@ export default function StrategyLab() {
 
           {backtest.isError && (
             <p style={{ fontSize: 12, color: 'var(--red)', marginTop: 10 }}>
-              {(backtest.error as any)?.response?.data?.detail ?? 'Backtest failed.'}
+              {(backtest.error as { response?: { data?: { detail?: string } } })?.response?.data
+                ?.detail ?? 'Backtest failed.'}
             </p>
           )}
 

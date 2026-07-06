@@ -23,9 +23,9 @@ from plutus.shared.smart_money.per_stock_score import FlowScore
 
 @dataclass(frozen=True)
 class FlowPillar:
-    score: int                  # 0..15
+    score: int  # 0..15
     components: dict[str, int]  # contributions of each sub-input (delivery only today)
-    source: str                 # "delivery_only" | "full_flow"
+    source: str  # "delivery_only" | "full_flow"
 
 
 def flow_pillar(delivery: DeliveryTrendScore, *, max_points: int = 15) -> FlowPillar:

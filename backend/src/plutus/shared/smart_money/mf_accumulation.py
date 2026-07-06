@@ -25,9 +25,7 @@ class MFAccumulation:
     """A7 age-decay. Mutual-fund holding trend with linear confidence decay:
     1.0 at 0 days since the latest observation, 0.5 at 60 days, 0.0 at 120+."""
 
-    def evaluate(
-        self, mf_holdings_history: pd.DataFrame, as_of: date
-    ) -> MFAccumulationVerdict:
+    def evaluate(self, mf_holdings_history: pd.DataFrame, as_of: date) -> MFAccumulationVerdict:
         ordered = mf_holdings_history.sort_values("as_of").reset_index(drop=True)
         first = float(ordered["mf_holding_pct"].iloc[0])
         last = float(ordered["mf_holding_pct"].iloc[-1])

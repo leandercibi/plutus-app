@@ -144,7 +144,7 @@ export function useRefreshAiSummary(kind: 'weekly' | 'daily') {
 export function useTriggerSundayRun() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (_?: undefined) => apiClient.post('/shared/runs/sunday').then(r => r.data),
+    mutationFn: () => apiClient.post('/shared/runs/sunday').then(r => r.data),
     onSuccess: () => {
       setTimeout(() => {
         qc.invalidateQueries({ queryKey: ['run-log'] })
@@ -158,7 +158,7 @@ export function useTriggerSundayRun() {
 export function useTriggerMondayRun() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (_?: undefined) => apiClient.post('/shared/runs/monday-revalidation').then(r => r.data),
+    mutationFn: () => apiClient.post('/shared/runs/monday-revalidation').then(r => r.data),
     onSuccess: () => {
       setTimeout(() => qc.invalidateQueries({ queryKey: ['run-log'] }), 3000)
     },
@@ -176,7 +176,7 @@ export function useRunBacktest() {
 export function useTriggerMidweekRun() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (_?: undefined) => apiClient.post('/shared/runs/midweek-mini').then(r => r.data),
+    mutationFn: () => apiClient.post('/shared/runs/midweek-mini').then(r => r.data),
     onSuccess: () => {
       setTimeout(() => qc.invalidateQueries({ queryKey: ['run-log'] }), 3000)
     },

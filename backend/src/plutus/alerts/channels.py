@@ -7,6 +7,7 @@ AlertKind = Literal[
     "SL_BREACH",
     "SL_WARNING",
     "T1_HIT",
+    "T2_HIT",
     "NO_PROGRESS",
     "ENTRY",
     "REGIME_FLIP",

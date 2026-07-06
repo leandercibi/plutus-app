@@ -19,9 +19,7 @@ class DrawdownGovernor:
 
     def _latest_state(self) -> DrawdownGovernorState | None:
         stmt = (
-            select(DrawdownGovernorState)
-            .order_by(DrawdownGovernorState.as_of_date.desc())
-            .limit(1)
+            select(DrawdownGovernorState).order_by(DrawdownGovernorState.as_of_date.desc()).limit(1)
         )
         return self._session.execute(stmt).scalars().first()
 
@@ -31,9 +29,7 @@ class DrawdownGovernor:
         drawdown = float((hwm - pool_value) / hwm)
         return drawdown >= self._settings.drawdown_governor_trigger_pct
 
-    def current_risk_multiplier(
-        self, pool_high_water_mark: Decimal, pool_value: Decimal
-    ) -> float:
+    def current_risk_multiplier(self, pool_high_water_mark: Decimal, pool_value: Decimal) -> float:
         triggered_now = self._is_drawdown_triggered(pool_high_water_mark, pool_value)
         if triggered_now:
             return self._settings.drawdown_governor_halving_factor
@@ -70,9 +66,7 @@ class DrawdownGovernor:
 
         existing = (
             self._session.execute(
-                select(DrawdownGovernorState).where(
-                    DrawdownGovernorState.as_of_date == as_of
-                )
+                select(DrawdownGovernorState).where(DrawdownGovernorState.as_of_date == as_of)
             )
             .scalars()
             .first()

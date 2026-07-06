@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 
-from plutus.alerts.channels import AlertMessage, AlertResult
+from plutus.alerts.channels import AlertChannel, AlertMessage, AlertResult
 from plutus.alerts.monitor import AlertMonitor
 from plutus.alerts.telegram import TelegramChannel
 from plutus.alerts.whatsapp import build_whatsapp_channel
@@ -21,7 +21,7 @@ class LogChannel:
 
 
 def build_alert_monitor(settings: Settings) -> AlertMonitor:
-    channels = []
+    channels: list[AlertChannel] = []
     if settings.telegram_bot_token is not None and settings.telegram_chat_id is not None:
         channels.append(
             TelegramChannel(

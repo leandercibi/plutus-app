@@ -44,9 +44,7 @@ class ExitManager:
         self._no_progress = NoProgressExit(settings)
         self._fills = fills
 
-    def tick(
-        self, view: OpenTradeView, candles: pd.DataFrame, today_bar: OHLCBar
-    ) -> ExitDecision:
+    def tick(self, view: OpenTradeView, candles: pd.DataFrame, today_bar: OHLCBar) -> ExitDecision:
         stop_fill = self._stop.check(
             view.plan, today_bar, self._fills, view.adv, view.atr_pct, view.qty
         )
@@ -62,8 +60,6 @@ class ExitManager:
             horizon_max_days=view.horizon_max_days,
         )
         if self._no_progress.should_exit(np_input, candles):
-            return ExitDecision(
-                "NO_PROGRESS", "no progress toward T1 by midpoint", None
-            )
+            return ExitDecision("NO_PROGRESS", "no progress toward T1 by midpoint", None)
 
         return ExitDecision("HOLD", "no exit condition met", None)
