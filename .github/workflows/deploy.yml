@@ -1,0 +1,45 @@
+name: Deploy
+
+# Auto-deploys to the OCI server whenever main advances (i.e. after a PR merges).
+# It SSHes in, fast-forwards the checkout to the merged commit, and re-runs the
+# existing deployment/deploy.sh (build + docker compose up -d + health check).
+#
+# Required repository secrets (Settings → Secrets and variables → Actions):
+#   OCI_HOST      public IP / hostname of the OCI instance
+#   OCI_USER      SSH user (ubuntu)
+#   OCI_SSH_KEY   private key (PEM) whose public half is in the server's authorized_keys
+#   OCI_SSH_PORT  optional; defaults to 22
+#
+# The server keeps its own deployment/.env (git-ignored) — this workflow never
+# touches secrets, it only pulls code and rebuilds.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build & restart on OCI
+    runs-on: ubuntu-latest
+    steps:
+      - name: SSH deploy
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          port: ${{ secrets.OCI_SSH_PORT || 22 }}
+          command_timeout: 20m
+          script: |
+            set -euo pipefail
+            cd /home/ubuntu/plutus-app
+            echo "== Fetching $GITHUB_SHA =="
+            git fetch --all --prune
+            git reset --hard origin/main
+            echo "== Deploying $(git rev-parse --short HEAD) =="
+            bash deployment/deploy.sh
