@@ -36,9 +36,9 @@ jobs:
           port: ${{ secrets.OCI_SSH_PORT || 22 }}
           command_timeout: 20m
           script: |
-            set -euo pipefail
+            set -eo pipefail
             cd /home/ubuntu/plutus-app
-            echo "== Fetching $GITHUB_SHA =="
+            echo "== Fetching latest origin/main =="
             git fetch --all --prune
             git reset --hard origin/main
             echo "== Deploying $(git rev-parse --short HEAD) =="
