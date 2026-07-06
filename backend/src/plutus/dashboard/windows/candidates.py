@@ -50,7 +50,7 @@ def render(candidates: list[CandidateView]) -> None:
 
         cap = " · valuation capped" if cand.valuation_capped else ""
         st.caption(
-            f"RS 30/90/180: {cand.rs_30*100:+.1f}%/{cand.rs_90*100:+.1f}%/{cand.rs_180*100:+.1f}% vs Nifty · "
+            f"RS 30/90/180: {cand.rs_30 * 100:+.1f}%/{cand.rs_90 * 100:+.1f}%/{cand.rs_180 * 100:+.1f}% vs Nifty · "
             f"CAGR EPS 3y {cand.cagr_eps_3y:.1f}% / 5y {cand.cagr_eps_5y:.1f}%{cap}"
         )
 
@@ -58,7 +58,7 @@ def render(candidates: list[CandidateView]) -> None:
             st.error(f"hard avoid: {reason}")
 
         chart_key = f"chart_cand_{cand.symbol}"
-        if st.button(f"📈 Price chart", key=f"btn_{chart_key}"):
+        if st.button("📈 Price chart", key=f"btn_{chart_key}"):
             st.session_state[chart_key] = True
             st.session_state.pop(f"chartdata_{chart_key}", None)
         if st.session_state.get(chart_key):
@@ -96,7 +96,9 @@ def _render_action_button(cand: CandidateView) -> None:
             st.caption(f"Open tranche 1 of 5 for **{sym}**")
             _fetch_and_store_ltp(sym, "start")
             price = st.number_input(
-                "Buy price (₹)", min_value=0.01, step=0.05,
+                "Buy price (₹)",
+                min_value=0.01,
+                step=0.05,
                 value=st.session_state[_ltp_key(sym, "start")],
                 key=f"sp_{sym}",
             )
@@ -115,7 +117,9 @@ def _render_action_button(cand: CandidateView) -> None:
             st.caption(f"Log tranche {next_seq} of {cand.total_tranches} for **{sym}**")
             _fetch_and_store_ltp(sym, "tranche")
             price = st.number_input(
-                "Buy price (₹)", min_value=0.01, step=0.05,
+                "Buy price (₹)",
+                min_value=0.01,
+                step=0.05,
                 value=st.session_state[_ltp_key(sym, "tranche")],
                 key=f"tp_{sym}",
             )
@@ -129,10 +133,14 @@ def _render_action_button(cand: CandidateView) -> None:
                     del st.session_state[_ltp_key(sym, "tranche")]
 
         with st.popover("✕ Exit", use_container_width=True):
-            st.caption(f"Log full exit for **{sym}** ({cand.tranches_filled}/{cand.total_tranches} tranches)")
+            st.caption(
+                f"Log full exit for **{sym}** ({cand.tranches_filled}/{cand.total_tranches} tranches)"
+            )
             _fetch_and_store_ltp(sym, "exit")
             price = st.number_input(
-                "Sell price (₹)", min_value=0.01, step=0.05,
+                "Sell price (₹)",
+                min_value=0.01,
+                step=0.05,
                 value=st.session_state[_ltp_key(sym, "exit")],
                 key=f"ep_{sym}",
             )

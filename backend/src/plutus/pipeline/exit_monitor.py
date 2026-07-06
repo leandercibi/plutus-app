@@ -26,6 +26,7 @@ def _build_ohlcv_chain(cfg: Settings) -> OHLCVChain:
     if all([cfg.angel_api_key, cfg.angel_client_id, cfg.angel_password, cfg.angel_totp_secret]):
         try:
             from plutus.data.providers.angelone_provider import AngelOneProvider
+
             primary = AngelOneProvider(
                 api_key=cfg.angel_api_key,
                 client_id=cfg.angel_client_id,
@@ -35,7 +36,7 @@ def _build_ohlcv_chain(cfg: Settings) -> OHLCVChain:
             return OHLCVChain(primary=primary, fallback=YFinanceProvider())  # type: ignore[arg-type]
         except Exception:
             pass
-    return OHLCVChain(primary=YFinanceProvider(), fallback=None)  # type: ignore[arg-type]
+    return OHLCVChain(primary=YFinanceProvider(), fallback=None)
 
 
 def _latest_bar(symbol: str, as_of: date, chain: OHLCVChain) -> OHLCBar | None:
@@ -74,13 +75,22 @@ def run_exit_monitor(
 
     with session_scope() as session:
         open_trades = (
-            session.query(SwingTrade)
-            .filter(SwingTrade.state.in_(["OPEN", "T1_HIT"]))
-            .all()
+            session.query(SwingTrade).filter(SwingTrade.state.in_(["OPEN", "T1_HIT"])).all()
         )
         for trade in open_trades:
             try:
-                _check_trade(trade, as_of, fill_policy, cost_model, formatter, monitor, session, cfg, counts, chain)
+                _check_trade(
+                    trade,
+                    as_of,
+                    fill_policy,
+                    cost_model,
+                    formatter,
+                    monitor,
+                    session,
+                    cfg,
+                    counts,
+                    chain,
+                )
             except Exception as exc:
                 counts["errors"] += 1
                 logger.error("exit check failed", extra={"trade": trade.id, "error": str(exc)})
@@ -103,6 +113,7 @@ def _check_trade(
     from typing import cast
 
     from plutus.alerts.monitor import AlertMonitor
+
     mon: AlertMonitor = cast(AlertMonitor, monitor)
 
     # Get the signal for stop/targets
@@ -127,18 +138,25 @@ def _check_trade(
     stop_fill = fill_policy.fill_stop(plan, bar, adv=500_000, atr_pct=0.02)
     if stop_fill is not None and trade.state == "OPEN":
         risk_per_share = signal.entry - signal.stop_loss
-        realized_R = float((stop_fill.price - signal.entry) / risk_per_share) if risk_per_share else 0.0
+        realized_R = (
+            float((stop_fill.price - signal.entry) / risk_per_share) if risk_per_share else 0.0
+        )
         trade.state = "CLOSED_LOSS"
         trade.closed_at = datetime.utcnow()
         trade.realized_R = realized_R
         trade.exit_reason = "SL_BREACH"
-        session.add(Fill(
-            trade_id=trade.id, kind="MOCK", side="SELL",
-            qty=trade.qty, price=stop_fill.price,
-            cost_inr=cost_model.sell_cost(trade.qty, stop_fill.price).total,
-            slippage_bps=stop_fill.slippage_bps,
-            filled_at=stop_fill.filled_at,
-        ))
+        session.add(
+            Fill(
+                trade_id=trade.id,
+                kind="MOCK",
+                side="SELL",
+                qty=trade.qty,
+                price=stop_fill.price,
+                cost_inr=cost_model.sell_cost(trade.qty, stop_fill.price).total,
+                slippage_bps=stop_fill.slippage_bps,
+                filled_at=stop_fill.filled_at,
+            )
+        )
         msg = formatter.format_sl_breach(trade.symbol, stop_fill.price, as_of)
         mon.emit(msg, now=datetime.utcnow(), session=session)
         counts["sl_breach"] += 1
@@ -149,14 +167,18 @@ def _check_trade(
     t1_fill = fill_policy.fill_target(plan, bar, target_level=1, adv=500_000, atr_pct=0.02)
     if t1_fill is not None and trade.state == "OPEN":
         trade.state = "T1_HIT"
-        session.add(Fill(
-            trade_id=trade.id, kind="MOCK", side="SELL",
-            qty=trade.qty // 2,
-            price=t1_fill.price,
-            cost_inr=cost_model.sell_cost(trade.qty // 2, t1_fill.price).total,
-            slippage_bps=t1_fill.slippage_bps,
-            filled_at=t1_fill.filled_at,
-        ))
+        session.add(
+            Fill(
+                trade_id=trade.id,
+                kind="MOCK",
+                side="SELL",
+                qty=trade.qty // 2,
+                price=t1_fill.price,
+                cost_inr=cost_model.sell_cost(trade.qty // 2, t1_fill.price).total,
+                slippage_bps=t1_fill.slippage_bps,
+                filled_at=t1_fill.filled_at,
+            )
+        )
         msg = formatter.format_t1_hit(trade.symbol, as_of)
         mon.emit(msg, now=datetime.utcnow(), session=session)
         counts["t1_hit"] += 1
@@ -169,16 +191,24 @@ def _check_trade(
             trade.state = "CLOSED_WIN"
             trade.closed_at = datetime.utcnow()
             risk_per_share = signal.entry - signal.stop_loss
-            trade.realized_R = float((t2_fill.price - signal.entry) / risk_per_share) if risk_per_share else 0.0
+            trade.realized_R = (
+                float((t2_fill.price - signal.entry) / risk_per_share) if risk_per_share else 0.0
+            )
             trade.exit_reason = "T2_HIT"
-            session.add(Fill(
-                trade_id=trade.id, kind="MOCK", side="SELL",
-                qty=trade.qty - (trade.qty // 2),
-                price=t2_fill.price,
-                cost_inr=cost_model.sell_cost(trade.qty - (trade.qty // 2), t2_fill.price).total,
-                slippage_bps=t2_fill.slippage_bps,
-                filled_at=t2_fill.filled_at,
-            ))
+            session.add(
+                Fill(
+                    trade_id=trade.id,
+                    kind="MOCK",
+                    side="SELL",
+                    qty=trade.qty - (trade.qty // 2),
+                    price=t2_fill.price,
+                    cost_inr=cost_model.sell_cost(
+                        trade.qty - (trade.qty // 2), t2_fill.price
+                    ).total,
+                    slippage_bps=t2_fill.slippage_bps,
+                    filled_at=t2_fill.filled_at,
+                )
+            )
             msg = formatter.format_t2_hit(trade.symbol, as_of)
             mon.emit(msg, now=datetime.utcnow(), session=session)
             counts.setdefault("t2_hit", 0)

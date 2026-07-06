@@ -67,7 +67,7 @@ class MarketauxProvider:
         if not wanted:
             return []
 
-        params = {
+        params: dict[str, str | int] = {
             "symbols": ",".join(self._to_market_symbol(s) for s in sorted(wanted)),
             "filter_entities": "true",
             "language": "en",
@@ -154,7 +154,7 @@ class MarketauxProvider:
         self, industry: str, limit: int = 3, lookback_days: int = 14, country: str = "in"
     ) -> list[NewsItem]:
         """Return recent news for a sector (industry), tagged with that sector."""
-        params: dict = {
+        params: dict[str, str | int] = {
             "industries": industry,
             "filter_entities": "true",
             "language": "en",

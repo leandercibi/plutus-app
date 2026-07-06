@@ -10,13 +10,13 @@ Usage (with SSH tunnel already open on port 5433):
 Open the SSH tunnel first:
     ssh -L 5433:127.0.0.1:5432 ubuntu@<OCI_IP> -N &
 """
+
 from __future__ import annotations
 
 import argparse
 import sys
 
 from sqlalchemy import create_engine, inspect, text
-from sqlalchemy.orm import Session
 
 
 def migrate(src_url: str, dst_url: str, dry_run: bool = False) -> None:
@@ -86,7 +86,9 @@ def migrate(src_url: str, dst_url: str, dry_run: bool = False) -> None:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Migrate SQLite → PostgreSQL")
     parser.add_argument("--src", required=True, help="Source SQLAlchemy URL (sqlite:///...)")
-    parser.add_argument("--dst", required=True, help="Destination SQLAlchemy URL (postgresql+psycopg://...)")
+    parser.add_argument(
+        "--dst", required=True, help="Destination SQLAlchemy URL (postgresql+psycopg://...)"
+    )
     parser.add_argument("--dry-run", action="store_true", help="Print row counts without writing")
     args = parser.parse_args()
 

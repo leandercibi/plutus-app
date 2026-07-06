@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -15,14 +16,14 @@ _FINANCIAL_KEYWORDS = ("bank", "financ", "insurance", "nbfc", "capital market")
 class FundamentalsData:
     """Fundamental data fetched from yfinance for a single NSE symbol."""
 
-    pe_ttm: float | None         # trailing P/E; None if not available
-    pe_5y_median: float | None   # 5-year median P/E; falls back to pe_ttm
-    ev_ebitda: float | None      # enterprise-value / EBITDA ratio
-    de: float                     # debt/equity ratio (0 when unavailable)
-    roce: float                   # ROE used as ROCE proxy; fractional (0.18 = 18%)
-    fcf_margin: float             # free-cash-flow / revenue; fractional
-    is_financial: bool            # true for banks / NBFCs / insurance
-    eps_history: pd.DataFrame     # columns: year (int), eps (float); oldest first
+    pe_ttm: float | None  # trailing P/E; None if not available
+    pe_5y_median: float | None  # 5-year median P/E; falls back to pe_ttm
+    ev_ebitda: float | None  # enterprise-value / EBITDA ratio
+    de: float  # debt/equity ratio (0 when unavailable)
+    roce: float  # ROE used as ROCE proxy; fractional (0.18 = 18%)
+    fcf_margin: float  # free-cash-flow / revenue; fractional
+    is_financial: bool  # true for banks / NBFCs / insurance
+    eps_history: pd.DataFrame  # columns: year (int), eps (float); oldest first
 
 
 class FundamentalsProvider:
@@ -38,7 +39,7 @@ class FundamentalsProvider:
         ticker_sym = symbol if "." in symbol else f"{symbol}.NS"
         try:
             ticker = yf.Ticker(ticker_sym)
-            info: dict = ticker.info or {}
+            info: dict[str, Any] = ticker.info or {}
         except Exception as exc:
             logger.warning("yfinance info failed for %s: %s", symbol, exc)
             return _empty()
@@ -79,7 +80,7 @@ class FundamentalsProvider:
         )
 
 
-def _build_eps_df(ticker, info: dict) -> pd.DataFrame:
+def _build_eps_df(ticker: Any, info: dict[str, Any]) -> pd.DataFrame:
     """Construct annual EPS DataFrame from yfinance income statement."""
     shares = _f(info.get("sharesOutstanding")) or _f(info.get("impliedSharesOutstanding"))
     if not shares or shares <= 0:
@@ -115,7 +116,7 @@ def _build_eps_df(ticker, info: dict) -> pd.DataFrame:
         return pd.DataFrame(columns=["year", "eps"])
 
 
-def _f(val: object, default: float | None = None) -> float | None:
+def _f(val: Any, default: float | None = None) -> float | None:
     if val is None:
         return default
     try:

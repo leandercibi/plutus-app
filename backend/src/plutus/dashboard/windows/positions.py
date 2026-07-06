@@ -5,11 +5,9 @@ import streamlit as st
 from plutus.dashboard.api_client import log_real_fill, manual_exit
 from plutus.dashboard.data import PositionView
 from plutus.dashboard.theme import (
-    BORDER,
     BUY_GREEN,
     LOSS_RED,
     SURFACE,
-    TEXT_PRIMARY,
     TEXT_SECONDARY,
     TEXT_TERTIARY,
 )
@@ -52,7 +50,7 @@ def render(positions: list[PositionView]) -> None:
             f"""<div style="margin: 10px 0; font-size: 11px; color: {TEXT_TERTIARY};">
 Elapsed to T1: {pos.elapsed_to_t1_pct:.0f}%</div>
 <div class="plutus-bar-track" style="margin-bottom: 6px;">
-  <div class="plutus-bar-fill" style="width:{int(progress*100)}%; background:{BUY_GREEN};"></div>
+  <div class="plutus-bar-fill" style="width:{int(progress * 100)}%; background:{BUY_GREEN};"></div>
 </div>""",
             unsafe_allow_html=True,
         )
@@ -62,22 +60,28 @@ Elapsed to T1: {pos.elapsed_to_t1_pct:.0f}%</div>
 
         # Buttons
         b1, b2 = st.columns(2)
-        with b1.popover("📋 Log real fill", use_container_width=True):
-            with st.form(key=f"posfill_form_{pos.trade_id}", border=False):
-                side = st.selectbox("Side", ["BUY", "SELL"], key=f"posside_{pos.trade_id}")
-                qty = st.number_input("Qty", min_value=1, value=1, key=f"posqty_{pos.trade_id}")
-                price = st.number_input(
-                    "Price", min_value=0.01, value=100.0, step=0.05, key=f"posprice_{pos.trade_id}"
-                )
-                if st.form_submit_button("Submit fill"):
-                    ok, msg = log_real_fill(pos.trade_id, side, int(qty), price)
-                    (st.success if ok else st.error)(msg)
-        with b2.popover("✖ Manual exit", use_container_width=True):
-            with st.form(key=f"posexit_form_{pos.trade_id}", border=False):
-                reason = st.text_input("Reason", value="user discretion", key=f"posreason_{pos.trade_id}")
-                if st.form_submit_button("Close trade", type="primary"):
-                    ok, msg = manual_exit(pos.trade_id, reason)
-                    (st.success if ok else st.error)(msg)
+        with (
+            b1.popover("📋 Log real fill", use_container_width=True),
+            st.form(key=f"posfill_form_{pos.trade_id}", border=False),
+        ):
+            side = st.selectbox("Side", ["BUY", "SELL"], key=f"posside_{pos.trade_id}")
+            qty = st.number_input("Qty", min_value=1, value=1, key=f"posqty_{pos.trade_id}")
+            price = st.number_input(
+                "Price", min_value=0.01, value=100.0, step=0.05, key=f"posprice_{pos.trade_id}"
+            )
+            if st.form_submit_button("Submit fill"):
+                ok, msg = log_real_fill(pos.trade_id, side, int(qty), price)
+                (st.success if ok else st.error)(msg)
+        with (
+            b2.popover("✖ Manual exit", use_container_width=True),
+            st.form(key=f"posexit_form_{pos.trade_id}", border=False),
+        ):
+            reason = st.text_input(
+                "Reason", value="user discretion", key=f"posreason_{pos.trade_id}"
+            )
+            if st.form_submit_button("Close trade", type="primary"):
+                ok, msg = manual_exit(pos.trade_id, reason)
+                (st.success if ok else st.error)(msg)
         st.markdown("</div>", unsafe_allow_html=True)
 
     st.markdown(f"### Recently closed (14d) — {len(closed_positions)}")
@@ -92,6 +96,6 @@ Elapsed to T1: {pos.elapsed_to_t1_pct:.0f}%</div>
             f"""<div style="background: {SURFACE}; padding: 8px 12px; border-radius: 6px;
 border-left: 2px solid {color}; margin-bottom: 6px; font-size: 12px;">
 <b>{pos.symbol}</b> · realized <span style="color:{color}">{pos.realized_R:+.2f}R</span>
-· {pos.exit_reason or 'closed'}{delta}</div>""",
+· {pos.exit_reason or "closed"}{delta}</div>""",
             unsafe_allow_html=True,
         )

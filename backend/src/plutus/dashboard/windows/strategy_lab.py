@@ -23,7 +23,6 @@ from plutus.dashboard.theme import (
     TEXT_TERTIARY,
 )
 
-
 _SWING_LABEL_COLORS = {
     "BUY": BUY_GREEN,
     "BUY_WATCH": "#f0a500",
@@ -41,8 +40,6 @@ _ACCUM_LABEL_COLORS = {
 
 def _run_quick_score(symbol: str) -> None:
     from datetime import date, timedelta
-
-    import pandas as pd
 
     from plutus.data.providers.yfinance_provider import YFinanceProvider
     from plutus.swing.scoring.pillars import technical_score
@@ -113,6 +110,7 @@ def _run_quick_score(symbol: str) -> None:
         from plutus.accumulation.fundamentals.hard_avoid import HardAvoidResult
         from plutus.accumulation.scoring.classifier import AccumulationClassifier
         from plutus.accumulation.scoring.pillars import compose_pillars
+
         pillars = compose_pillars(quality_score, 12, 15, rs_blended)
         accum_label = AccumulationClassifier().classify(
             pillar_score=pillars.total,
@@ -163,10 +161,10 @@ def _render_quick_score(symbol: str) -> None:
             )
             st.markdown(
                 f'<div style="font-size:12px;color:{TEXT_SECONDARY};line-height:1.8;">'
-                f'Trend momentum: <b>{sw["trend_momentum"]}</b> · ATR rank: <b>{sw["atr_percentile"]}</b><br>'
-                f'Mean reversion: <b>{sw["mean_reversion"]}</b> · MACD cross: <b>+{sw["macd_cross_bonus"]}</b> · BB squeeze: <b>+{sw["bb_squeeze_bonus"]}</b><br>'
-                f'Above 50 DMA: {"✓" if sw["above_50dma"] else "✗"} · Above 200 DMA: {"✓" if sw["above_200dma"] else "✗"}'
-                f'</div>',
+                f"Trend momentum: <b>{sw['trend_momentum']}</b> · ATR rank: <b>{sw['atr_percentile']}</b><br>"
+                f"Mean reversion: <b>{sw['mean_reversion']}</b> · MACD cross: <b>+{sw['macd_cross_bonus']}</b> · BB squeeze: <b>+{sw['bb_squeeze_bonus']}</b><br>"
+                f"Above 50 DMA: {'✓' if sw['above_50dma'] else '✗'} · Above 200 DMA: {'✓' if sw['above_200dma'] else '✗'}"
+                f"</div>",
                 unsafe_allow_html=True,
             )
         elif "swing_error" in result:
@@ -187,13 +185,15 @@ def _render_quick_score(symbol: str) -> None:
             )
             st.markdown(
                 f'<div style="font-size:12px;color:{TEXT_SECONDARY};line-height:1.8;">'
-                f'Quality: <b>{ac["quality"]}/30</b> · Growth: <b>{ac["growth"]}/25</b> · '
-                f'Valuation: <b>{ac["valuation"]}/30</b> · RS: <b>{ac["rs"]}/15</b><br>'
-                f'RS vs Nifty — 30d: <b>{ac["rs_30"]:+.1f}%</b> · 90d: <b>{ac["rs_90"]:+.1f}%</b> · 180d: <b>{ac["rs_180"]:+.1f}%</b>'
-                f'</div>',
+                f"Quality: <b>{ac['quality']}/30</b> · Growth: <b>{ac['growth']}/25</b> · "
+                f"Valuation: <b>{ac['valuation']}/30</b> · RS: <b>{ac['rs']}/15</b><br>"
+                f"RS vs Nifty — 30d: <b>{ac['rs_30']:+.1f}%</b> · 90d: <b>{ac['rs_90']:+.1f}%</b> · 180d: <b>{ac['rs_180']:+.1f}%</b>"
+                f"</div>",
                 unsafe_allow_html=True,
             )
-            st.caption("Note: Quality pillar here uses technical score as proxy. Full accumulation scoring requires fundamentals (PE, D/E, EPS history) which are fetched during the Sunday pipeline run.")
+            st.caption(
+                "Note: Quality pillar here uses technical score as proxy. Full accumulation scoring requires fundamentals (PE, D/E, EPS history) which are fetched during the Sunday pipeline run."
+            )
         elif "accum_error" in result:
             st.caption(f"Accum error: {result['accum_error']}")
 
@@ -204,7 +204,9 @@ def render(data: StrategyLabView) -> None:
         st.info("No data yet.")
         return
     st.title("Strategy lab")
-    st.caption("Single-symbol single-bundle screening. Display-only — not evidence for live sizing.")
+    st.caption(
+        "Single-symbol single-bundle screening. Display-only — not evidence for live sizing."
+    )
 
     st.markdown(
         f"""<div style="background:{DEAD_ZONE_BG}; border-left: 2px solid {DEAD_ZONE};
@@ -236,7 +238,11 @@ calibrated. Live evidence comes from the postmortem (spec 15 go-live bar).
         )
 
     if symbol is not None:
-        if st.button("⚡ Quick score", key="lab_quick_score", help="Compute swing + accumulation score for this symbol"):
+        if st.button(
+            "⚡ Quick score",
+            key="lab_quick_score",
+            help="Compute swing + accumulation score for this symbol",
+        ):
             with st.spinner(f"Scoring {symbol}…"):
                 _run_quick_score(symbol)
 
@@ -259,18 +265,16 @@ calibrated. Live evidence comes from the postmortem (spec 15 go-live bar).
     if not bundle_supported and symbol is not None:
         gated_reason = {
             "pead": "Gated by spec **C2** — paper-only until verified earnings calendar "
-                    "+ one earnings season with the cost model proves net positive.",
+            "+ one earnings season with the cost model proves net positive.",
             "smc": "Gated by spec **C3** — excluded from live seeding until pooled OOS "
-                   "per-regime evidence justifies the slot.",
+            "per-regime evidence justifies the slot.",
         }.get(bundle, f"{bundle} not wired into the inline lab.")
         st.caption(gated_reason)
 
     if run and symbol is not None and bundle_supported:
         with st.spinner(f"Running {bundle} on {symbol} · {lookback}d…"):
             try:
-                summary = run_single_symbol_backtest(
-                    bundle, symbol, lookback, use_costs, use_fills
-                )
+                summary = run_single_symbol_backtest(bundle, symbol, lookback, use_costs, use_fills)
             except Exception as exc:  # noqa: BLE001
                 st.error(f"Backtest failed: {exc}")
             else:
@@ -284,16 +288,12 @@ calibrated. Live evidence comes from the postmortem (spec 15 go-live bar).
         )
         m1, m2, m3, m4 = st.columns(4)
         m1.metric("Trades", summary.n_trades)
-        m2.metric(
-            "Win rate", f"{summary.win_rate * 100:.1f}%" if summary.n_trades else "—"
-        )
+        m2.metric("Win rate", f"{summary.win_rate * 100:.1f}%" if summary.n_trades else "—")
         m3.metric(
             "Expectancy",
             f"{summary.expectancy_R:+.2f}R" if summary.n_trades else "—",
         )
-        m4.metric(
-            "Sum R", f"{summary.sum_R:+.2f}R" if summary.n_trades else "—"
-        )
+        m4.metric("Sum R", f"{summary.sum_R:+.2f}R" if summary.n_trades else "—")
         if summary.n_trades == 0:
             st.info(
                 "No trades produced. Either the bundle never fit a signal in the window, "

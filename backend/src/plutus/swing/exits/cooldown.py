@@ -22,9 +22,7 @@ class CooldownPolicy:
     def __init__(self, settings: Settings) -> None:
         self._window = timedelta(minutes=settings.cooldown_minutes)
 
-    def can_fire(
-        self, symbol: str, kind: CooldownKind, now: datetime, session: Session
-    ) -> bool:
+    def can_fire(self, symbol: str, kind: CooldownKind, now: datetime, session: Session) -> bool:
         if kind == "SL_BREACH":
             return True
         last = self._last_fired(symbol, kind, session)
@@ -41,9 +39,7 @@ class CooldownPolicy:
         else:
             row.last_fired_at = now
 
-    def _row(
-        self, symbol: str, kind: CooldownKind, session: Session
-    ) -> AlertCooldown | None:
+    def _row(self, symbol: str, kind: CooldownKind, session: Session) -> AlertCooldown | None:
         stmt = (
             select(AlertCooldown)
             .where(AlertCooldown.symbol == symbol, AlertCooldown.kind == kind)
@@ -52,8 +48,6 @@ class CooldownPolicy:
         )
         return session.execute(stmt).scalars().first()
 
-    def _last_fired(
-        self, symbol: str, kind: CooldownKind, session: Session
-    ) -> datetime | None:
+    def _last_fired(self, symbol: str, kind: CooldownKind, session: Session) -> datetime | None:
         row = self._row(symbol, kind, session)
         return row.last_fired_at if row is not None else None

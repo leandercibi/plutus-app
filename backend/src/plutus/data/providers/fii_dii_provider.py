@@ -29,9 +29,11 @@ class FIIDIIStubProvider:
     def fetch(self, start: date, end: date) -> pd.DataFrame:
         try:
             raw = yf.download(
-                "^NSEI", start=start - timedelta(days=10),
+                "^NSEI",
+                start=start - timedelta(days=10),
                 end=end + timedelta(days=1),
-                auto_adjust=True, progress=False,
+                auto_adjust=True,
+                progress=False,
             )
             if raw.empty:
                 raise ValueError("empty")
@@ -41,17 +43,13 @@ class FIIDIIStubProvider:
             rng = np.random.default_rng(_RNG_SEED)
             noise = rng.normal(0, 0.15, size=len(pct))
             fii = pct * _FII_SCALE
-            dii = -fii * _DII_COUNTER_RATIO + pd.Series(
-                noise * _FII_SCALE * 0.1, index=pct.index
-            )
+            dii = -fii * _DII_COUNTER_RATIO + pd.Series(noise * _FII_SCALE * 0.1, index=pct.index)
             df = pd.DataFrame(
                 {"fii_net_inr_crore": fii / _CRORE, "dii_net_inr_crore": dii / _CRORE},
                 index=pct.index,
             )
-            return df.loc[str(start):str(end)]
+            return df.loc[str(start) : str(end)]  # type: ignore[misc]
         except Exception as exc:
             logger.warning("FII/DII stub fetch failed: %s; returning zeros", exc)
             idx = pd.date_range(start, end, freq="B")
-            return pd.DataFrame(
-                {"fii_net_inr_crore": 0.0, "dii_net_inr_crore": 0.0}, index=idx
-            )
+            return pd.DataFrame({"fii_net_inr_crore": 0.0, "dii_net_inr_crore": 0.0}, index=idx)

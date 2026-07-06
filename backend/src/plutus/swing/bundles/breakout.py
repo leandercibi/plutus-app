@@ -65,9 +65,7 @@ class BreakoutBundle(BaseBundle):
             return None
 
         entry = Decimal(str(price))
-        stop = Decimal(str(donchian_high)) - Decimal(str(_STOP_ATR_BUFFER)) * Decimal(
-            str(last_atr)
-        )
+        stop = Decimal(str(donchian_high)) - Decimal(str(_STOP_ATR_BUFFER)) * Decimal(str(last_atr))
         risk = entry - stop
         target_1 = entry + Decimal(str(_T1_RR)) * risk
         target_2 = entry + Decimal(str(_T2_RR)) * risk

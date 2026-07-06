@@ -6,7 +6,6 @@ from plutus.dashboard.theme import (
     BUY_GREEN,
     DEAD_ZONE,
     DEAD_ZONE_BG,
-    LOSS_RED,
     SURFACE,
     TEXT_PRIMARY,
     TEXT_SECONDARY,
@@ -33,7 +32,7 @@ _TERMS: list[dict] = [
             "periods shows genuine ability. One who aced last month but was below average all semester is probably just having a good day."
         ),
         "example": "RS 30 = +8 %, RS 90 = +5 %, RS 180 = +3 % → the stock has been outperforming consistently and accelerating. "
-                   "RS 30 = +8 %, RS 90 = -2 %, RS 180 = -4 % → a one-month bounce, not a trend.",
+        "RS 30 = +8 %, RS 90 = -2 %, RS 180 = -4 % → a one-month bounce, not a trend.",
         "how_to_use": (
             "All three positive → institutions are likely accumulating. Start watching for a tranche entry. "
             "RS 30 positive but RS 90/180 negative → wait. This is a bounce, not a trend. "
@@ -55,7 +54,7 @@ _TERMS: list[dict] = [
             "The blend score rewards the full-race performance."
         ),
         "example": "RS 30 = +10 %, RS 90 = +6 %, RS 180 = +4 % → blend ≈ +6 %. Normalized to 15-point scale → RS Pillar ≈ 9. "
-                   "RS 30 = +15 %, RS 90 = -3 %, RS 180 = -5 % → blend ≈ -0.2 %, RS Pillar ≈ 0.",
+        "RS 30 = +15 %, RS 90 = -3 %, RS 180 = -5 % → blend ≈ -0.2 %, RS Pillar ≈ 0.",
         "how_to_use": (
             "RS Pillar ≥ 10/15 → consistent outperformer, worth accumulating. "
             "RS Pillar < 5 → lagging the index at every horizon. Even if cheap, relative weakness often continues. "
@@ -77,7 +76,7 @@ _TERMS: list[dict] = [
             "A great restaurant has a packed kitchen, owns the property outright, and has cash in the till."
         ),
         "example": "ROCE = 28 %, D/E = 0.2, FCF margin = 18 % → Quality ≈ 27/30 (excellent compounder). "
-                   "ROCE = 10 %, D/E = 1.8, FCF margin = 3 % → Quality ≈ 12/30 (mediocre, borderline).",
+        "ROCE = 10 %, D/E = 1.8, FCF margin = 3 % → Quality ≈ 12/30 (mediocre, borderline).",
         "how_to_use": (
             "Quality ≥ 22 is required for ACCUMULATE_NOW — it's a hard floor. "
             "Quality 22–25 = decent business, an acceptable candidate. "
@@ -100,7 +99,7 @@ _TERMS: list[dict] = [
             "The system ignores that spike and rewards Employee A."
         ),
         "example": "EPS CAGR 3y = 18 %, 5y = 15 % → Growth ≈ 20/25. "
-                   "EPS CAGR 3y = 5 %, 5y = 2 % → Growth ≈ 6/25 (stagnant).",
+        "EPS CAGR 3y = 5 %, 5y = 2 % → Growth ≈ 6/25 (stagnant).",
         "how_to_use": (
             "Growth 20–25 = strong compounder. Pair with Quality 25+ for a rare 'buy and hold forever' candidate. "
             "Growth 10–15 = decent, still accumulate-worthy if Quality and Valuation compensate. "
@@ -123,7 +122,7 @@ _TERMS: list[dict] = [
             "Without historical PE data, every stock is the 'new shirt'. That's why Valuation is often 0."
         ),
         "example": "Normal PE = 35, current PE = 20 → 43% discount → Valuation ≈ 25/30. "
-                   "Normal PE = 30, current PE = 32 → slight premium → Valuation = 0.",
+        "Normal PE = 30, current PE = 32 → slight premium → Valuation = 0.",
         "how_to_use": (
             "Don't penalise a stock for Valuation = 0 — it means 'unknown', not 'expensive'. "
             "A non-zero Valuation score is a genuine signal that the stock is trading below its historical norm. "
@@ -148,7 +147,7 @@ _TERMS: list[dict] = [
             "The key difference from ordinary traffic lights: you can wait as long as you want for green."
         ),
         "example": "HDFCBANK: Quality 27, Growth 18, Valuation 0, RS Blend 12 → total 57 → WATCH (Valuation holding it back). "
-                   "If Valuation data becomes available and it scores 15 → total 72 → BUILD_SLOWLY.",
+        "If Valuation data becomes available and it scores 15 → total 72 → BUILD_SLOWLY.",
         "how_to_use": (
             "ACCUMULATE_NOW + RS Pillar ≥ 10 + Quality ≥ 25 = highest conviction → start with tranche 1. "
             "BUILD_SLOWLY → fine for tranche 1 if you have personal conviction in the thesis, but size down. "
@@ -172,7 +171,7 @@ _TERMS: list[dict] = [
             "Each pour lowers your average 'fill cost'."
         ),
         "example": "Tranche 1: buy at ₹1,000. Stock drops to ₹960. Tranche 2: buy at ₹960. Average cost = ₹980. "
-                   "Stock drops to ₹910. Tranche 3: ₹910. Average cost = ₹957. Now waiting for either tranche 4 or a rally.",
+        "Stock drops to ₹910. Tranche 3: ₹910. Average cost = ₹957. Now waiting for either tranche 4 or a rally.",
         "how_to_use": (
             "Use the tranche trigger price the system suggests (based on ATR). Don't rush to fill all 5. "
             "If the stock rallies after tranche 1 and you miss tranches 2–5, that's fine — tranche 1 is profitable. "
@@ -194,8 +193,8 @@ _TERMS: list[dict] = [
             "because the downside risk is too high to justify the potential upside."
         ),
         "example": "A pharma company with ROCE 25%, D/E 0.2, EPS CAGR 20% — all great. "
-                   "But last quarter EPS dropped 65% YoY. Hard Avoid fires. "
-                   "Reason: a single catastrophic quarter can signal FDA issues, patent cliff, or fraud.",
+        "But last quarter EPS dropped 65% YoY. Hard Avoid fires. "
+        "Reason: a single catastrophic quarter can signal FDA issues, patent cliff, or fraud.",
         "how_to_use": (
             "Respect the flag. Don't manually override without specific knowledge. "
             "D/E breach: check if it's temporary (acquisitions) or structural (operational losses). "
@@ -217,7 +216,7 @@ _TERMS: list[dict] = [
             "At that rate, even paying a high PE today can be justified — you're buying tomorrow's earnings."
         ),
         "example": "CAGR 3y = 22%, CAGR 5y = 18% → accelerating growth, excellent signal. "
-                   "CAGR 3y = 5%, CAGR 5y = 18% → growth is decelerating badly, despite good history.",
+        "CAGR 3y = 5%, CAGR 5y = 18% → growth is decelerating badly, despite good history.",
         "how_to_use": (
             "Look at both numbers together. If 5y > 3y, growth is slowing — reduce conviction. "
             "If 3y > 5y, growth is accelerating — increase conviction. "
@@ -240,7 +239,7 @@ _TERMS: list[dict] = [
             "High ROCE businesses earn well above their cost of capital, creating real wealth."
         ),
         "example": "ROCE 30%: for every ₹100 the company uses, it makes ₹30 profit. "
-                   "After accounting for 10% cost of capital, it creates ₹20 of value. This is rare and precious.",
+        "After accounting for 10% cost of capital, it creates ₹20 of value. This is rare and precious.",
         "how_to_use": (
             "ROCE > 20% = high quality business, strong Quality Pillar score. "
             "ROCE 12–20% = decent, acceptable. Below 12% = mediocre or capital-intensive. "
@@ -287,7 +286,7 @@ _TERMS: list[dict] = [
             "One spending ₹7L and keeping ₹3L as FCF (30% margin) is a cash machine."
         ),
         "example": "Revenue ₹1,000 Cr, FCF ₹150 Cr → FCF margin 15% (healthy). "
-                   "Revenue ₹1,000 Cr, FCF ₹20 Cr → FCF margin 2% (borderline, capital-heavy).",
+        "Revenue ₹1,000 Cr, FCF ₹20 Cr → FCF margin 2% (borderline, capital-heavy).",
         "how_to_use": (
             "FCF margin > 12% = strong cash generation, comfortable Quality score. "
             "FCF margin 5–12% = acceptable for capital-intensive industries. "
@@ -312,7 +311,7 @@ _TERMS: list[dict] = [
             "PE alone tells you the 'sticker price'. Growth tells you if the sticker price is fair."
         ),
         "example": "PE = 40 with 30% EPS growth: PEG ratio = 40/30 = 1.3 (fair). "
-                   "PE = 15 with 0% EPS growth: PEG = 15/0 = infinite (cheap but going nowhere).",
+        "PE = 15 with 0% EPS growth: PEG = 15/0 = infinite (cheap but going nowhere).",
         "how_to_use": (
             "Use PE TTM in context of EPS CAGR. Never say 'it's cheap at PE 12' without checking if earnings are growing. "
             "The Valuation Pillar compares PE TTM to 5y median PE — that context matters more than the absolute number. "
@@ -338,7 +337,7 @@ _TERMS: list[dict] = [
             "Each technique suits different market conditions."
         ),
         "example": "BULL regime: Trend and VCP historically have highest expectancy. "
-                   "SIDEWAYS regime: all bundles downgrade signals to WATCH automatically.",
+        "SIDEWAYS regime: all bundles downgrade signals to WATCH automatically.",
         "how_to_use": (
             "Check the Calibration window to see which bundle has highest expectancy in the current regime. "
             "Don't cherry-pick bundles based on recent performance — use the full calibration history. "
@@ -362,7 +361,7 @@ _TERMS: list[dict] = [
             "Expressing all results in R lets you compare a ₹500 stock trade with a ₹5,000 stock trade fairly."
         ),
         "example": "₹5,00,000 capital × 1% risk per trade = 1R = ₹5,000. "
-                   "Entry ₹1,000, stop ₹950 → risk = ₹50/share. Shares = ₹5,000 ÷ ₹50 = 100 shares.",
+        "Entry ₹1,000, stop ₹950 → risk = ₹50/share. Shares = ₹5,000 ÷ ₹50 = 100 shares.",
         "how_to_use": (
             "Size every trade so that 1R = 1% of capital (default setting). "
             "Never move your stop to increase position size after entry. "
@@ -386,7 +385,7 @@ _TERMS: list[dict] = [
             "1.5× ATR is the calibrated sweet spot."
         ),
         "example": "Stock at ₹1,000, ATR = ₹40. Stop = ₹1,000 − 1.5 × ₹40 = ₹940. "
-                   "Normal daily range = ₹40, so ₹940 is just below that noise.",
+        "Normal daily range = ₹40, so ₹940 is just below that noise.",
         "how_to_use": (
             "Never widen a stop after entry. If price approaches your stop, let it trigger. "
             "Widening stops is the most common way traders turn small losses into catastrophic ones. "
@@ -411,7 +410,7 @@ _TERMS: list[dict] = [
             "You sell half at T1 and let the rest ride to T2."
         ),
         "example": "Entry ₹1,000, stop ₹940 (1R = ₹60). T1 = ₹1,120 (+2R). T2 = ₹1,240 (+4R). "
-                   "At T1: sell 50%, move stop to entry (₹1,000). Remaining 50% rides to T2.",
+        "At T1: sell 50%, move stop to entry (₹1,000). Remaining 50% rides to T2.",
         "how_to_use": (
             "The system marks a trade T1_HIT when price reaches T1. "
             "At that point: take partial profits, raise stop to entry (trade is now risk-free). "
@@ -435,7 +434,7 @@ _TERMS: list[dict] = [
             "A sleeping patient's heartbeat varying by 5 bpm is fine. 50 bpm swings is unusual."
         ),
         "example": "ATR ₹30 on ₹1,000 stock = 3% daily range is normal. "
-                   "During earnings week, ATR might jump to ₹80 — that's why we avoid holding through earnings.",
+        "During earnings week, ATR might jump to ₹80 — that's why we avoid holding through earnings.",
         "how_to_use": (
             "Stop = entry − 1.5 × ATR. "
             "Position size = (1R in rupees) ÷ (1.5 × ATR). "
@@ -460,7 +459,7 @@ _TERMS: list[dict] = [
             "Over 100 trades risking ₹5,000 each: ₹5,000 × 0.4 × 100 = ₹2,00,000 expected profit."
         ),
         "example": "40 closed trades: 20 wins avg +1.8R, 20 losses avg −1R. "
-                   "Expectancy = (0.5 × 1.8) − (0.5 × 1.0) = 0.90 − 0.50 = 0.40R.",
+        "Expectancy = (0.5 × 1.8) − (0.5 × 1.0) = 0.90 − 0.50 = 0.40R.",
         "how_to_use": (
             "Expectancy > 0.3R = strategy is working well, maintain sizing. "
             "Expectancy 0.1–0.3R = marginal, review entry criteria or wait for more data. "
@@ -483,7 +482,7 @@ _TERMS: list[dict] = [
             "or a high-difficulty routine with one bad landing (Technical 28 but Flow 4)."
         ),
         "example": "Total 78: Technical 12, Expectancy 18, Flow 8, Regime Fit 15, Fundamentals 25. "
-                   "→ Great regime fit and fundamentals but weak chart setup and flow. Trade with caution on timing.",
+        "→ Great regime fit and fundamentals but weak chart setup and flow. Trade with caution on timing.",
         "how_to_use": (
             "Technical < 15/30: the chart setup isn't clean. Wait for a better entry or skip. "
             "Regime Fit < 10/15: conditions aren't ideal. Reduce size. "
@@ -508,7 +507,7 @@ _TERMS: list[dict] = [
             "You can still trade in rain, but you'd wear a raincoat and go slower."
         ),
         "example": "Nifty at ATH with 65% of stocks above 50DMA, VIX at 12, FII buying → BULL. "
-                   "Nifty in correction with 38% above 50DMA, VIX at 21, FII selling → SIDEWAYS.",
+        "Nifty in correction with 38% above 50DMA, VIX at 21, FII selling → SIDEWAYS.",
         "how_to_use": (
             "BULL + breadth confirmed: full swing size, run all bundles. "
             "SIDEWAYS: reduce to 50% swing allocation, only VCP and Composite. "
@@ -532,7 +531,7 @@ _TERMS: list[dict] = [
             "Interestingly: VIX falling from a peak is often the best time to buy — the storm is passing."
         ),
         "example": "March 2020: VIX hit 86 — panic peak. Buying at VIX > 50 historically gives 30%+ returns over 12 months. "
-                   "Jan 2024: VIX at 11.5 (calm). Markets rallied further for months.",
+        "Jan 2024: VIX at 11.5 (calm). Markets rallied further for months.",
         "how_to_use": (
             "VIX > 18: reduce new swing position sizes. "
             "VIX > 25: pause new positions entirely. "
@@ -556,7 +555,7 @@ _TERMS: list[dict] = [
             "A/D ratio tells you how many 'players' are contributing to the market's score."
         ),
         "example": "Nifty +0.8% but A/D = 0.7 (more stocks fell than rose) → narrow rally, leadership is thinning, be cautious. "
-                   "Nifty +1.2% with A/D = 3.2 → broad participation, healthy rally.",
+        "Nifty +1.2% with A/D = 3.2 → broad participation, healthy rally.",
         "how_to_use": (
             "Use as a confirmation tool. A/D consistently < 1 while Nifty is rising = deteriorating breadth, "
             "distribution happening underneath. Reduce new positions. "
@@ -579,7 +578,7 @@ _TERMS: list[dict] = [
             "When both buy together: double confirmation. When both sell: serious concern."
         ),
         "example": "FII −₹5,000 Cr + DII +₹6,000 Cr: typical 'DII absorbs FII selling' pattern. Market holds up. "
-                   "FII +₹4,000 Cr + DII +₹3,000 Cr: both buying = strong bull impulse.",
+        "FII +₹4,000 Cr + DII +₹3,000 Cr: both buying = strong bull impulse.",
         "how_to_use": (
             "3+ weeks of FII net selling: reduce swing exposure, especially in mid-caps. "
             "FII net buying resuming after a period of selling: consider this the start of the next leg. "
@@ -602,7 +601,7 @@ _TERMS: list[dict] = [
             "Breadth confirmed means the whole team is playing well — a much more sustainable win."
         ),
         "example": "Nifty at all-time high with 68% of Nifty 500 above 50DMA → breadth confirmed. "
-                   "Nifty at all-time high with only 45% above 50DMA → narrow rally, breadth NOT confirmed.",
+        "Nifty at all-time high with only 45% above 50DMA → narrow rally, breadth NOT confirmed.",
         "how_to_use": (
             "Breadth confirmed = True: highest conviction for both swing and accumulation positions. "
             "Breadth confirmed = False but BULL: proceed with swing positions but smaller size; "
@@ -627,8 +626,8 @@ _TERMS: list[dict] = [
             "OOS Sharpe is your actual exam score."
         ),
         "example": "Trend bundle IS Sharpe = 1.8 (tested on 2020–2022 data used to build the bundle). "
-                   "OOS Sharpe = 1.1 (tested on 2023–2024, never seen before). "
-                   "OOS Sharpe 1.1 is the number to trust.",
+        "OOS Sharpe = 1.1 (tested on 2023–2024, never seen before). "
+        "OOS Sharpe 1.1 is the number to trust.",
         "how_to_use": (
             "Always focus on OOS Sharpe in the Walk-Forward results. "
             "IS Sharpe > OOS Sharpe by >50%: likely overfit — reduce live allocation. "
@@ -654,7 +653,7 @@ _TERMS: list[dict] = [
             "In trading, a smooth journey matters — drawdowns cause emotional decision-making."
         ),
         "example": "50 trades, mean R = 0.45, std R = 0.9 → Sharpe = 0.45/0.9 = 0.5 (decent). "
-                   "50 trades, mean R = 0.45, std R = 0.4 → Sharpe = 1.1 (excellent).",
+        "50 trades, mean R = 0.45, std R = 0.4 → Sharpe = 1.1 (excellent).",
         "how_to_use": (
             "Sharpe > 1.0: excellent — strategy is consistent and profitable. Size up. "
             "Sharpe 0.5–1.0: decent — keep trading at standard size, continue calibrating. "
@@ -678,8 +677,8 @@ _TERMS: list[dict] = [
             "using only the skills learned from prior routes."
         ),
         "example": "8 walk-forward windows for 'Trend' bundle: "
-                   "IS Sharpe [1.8, 1.6, 2.0, 1.5, ...], OOS Sharpe [1.2, 1.1, 1.4, 1.0, ...]. "
-                   "Consistent OOS ≈ 70% of IS → robust strategy, no overfit flag.",
+        "IS Sharpe [1.8, 1.6, 2.0, 1.5, ...], OOS Sharpe [1.2, 1.1, 1.4, 1.0, ...]. "
+        "Consistent OOS ≈ 70% of IS → robust strategy, no overfit flag.",
         "how_to_use": (
             "Run walk-forward before increasing allocation to any bundle. "
             "Check: is OOS Sharpe consistently ≥ 0.5? Are IS/OOS ratios consistent (not just one good window)? "
@@ -701,7 +700,7 @@ _TERMS: list[dict] = [
             "The gap reveals memorisation, not understanding. The overfit flag catches this for trading strategies."
         ),
         "example": "8 windows: 5 windows where OOS drops > 50% of IS, 3 where it doesn't. "
-                   "5/8 = 62.5% > 50% → Overfit flag = YES.",
+        "5/8 = 62.5% > 50% → Overfit flag = YES.",
         "how_to_use": (
             "Overfit flag YES → don't scale up based on backtest. "
             "Gather 30+ live trades at minimum position size first. "
@@ -725,7 +724,7 @@ _TERMS: list[dict] = [
             "Calibration is your trading model getting smarter with every trade you close."
         ),
         "example": "Trend bundle, BULL regime: 10 trades, win rate 60%, expectancy 0.4R → 'medium' confidence. "
-                   "After 40 trades: same numbers → 'high' confidence. Now you can trust and act on them.",
+        "After 40 trades: same numbers → 'high' confidence. Now you can trust and act on them.",
         "how_to_use": (
             "Check after every 10 closed trades. "
             "Low confidence (< 15 trades): don't change sizing based on these numbers. "
@@ -749,7 +748,7 @@ _TERMS: list[dict] = [
             "The confidence band is your polling margin of error."
         ),
         "example": "n=8: win rate 62.5%, CI [25%, 90%] — the true rate could be anywhere in that huge range. "
-                   "n=50: win rate 62%, CI [48%, 74%] — much more useful.",
+        "n=50: win rate 62%, CI [48%, 74%] — much more useful.",
         "how_to_use": (
             "Only make sizing decisions when confidence band is 'medium' or 'high'. "
             "Never increase size based on 5–8 trades — it's pure noise. "
@@ -773,7 +772,7 @@ _TERMS: list[dict] = [
             "A consistent gap between MFE and realized R means your exit rules are leaving money on the table."
         ),
         "example": "Trade closed at +1.5R. MFE was +3.2R. → The stock hit T2 territory but you exited at T1. "
-                   "Pattern across many trades: consider holding T1-hit positions longer or trailing stop wider.",
+        "Pattern across many trades: consider holding T1-hit positions longer or trailing stop wider.",
         "how_to_use": (
             "MFE near realized R: you captured most of the available move. Good exit timing. "
             "MFE much higher than realized R: you exited too early. Review your trail-stop rules. "
@@ -795,7 +794,7 @@ _TERMS: list[dict] = [
             "Trades with high MAE that still win are stressful — and often a sign your entries are slightly too early."
         ),
         "example": "Trade closed at +2R, MAE was -0.8R. → Almost stopped out, then rallied. "
-                   "Distribution: if many winners have MAE worse than -0.5R, your entry timing is poor.",
+        "Distribution: if many winners have MAE worse than -0.5R, your entry timing is poor.",
         "how_to_use": (
             "MAE close to -1R consistently: entries are mistimed. Try entering on the next pullback. "
             "MAE very small (-0.2R or better) on most trades: entries are precise — stops could potentially be tighter. "
@@ -817,8 +816,8 @@ _TERMS: list[dict] = [
             "The harness moves up with you, never down. You give up the absolute peak in exchange for guaranteed safety."
         ),
         "example": "Entry ₹1,000, T1 hit at ₹1,100. Stop moved to ₹1,000 (risk-free). "
-                   "Price rises to ₹1,180, trailing stop moves to ₹1,120. "
-                   "Price reverses to ₹1,118 → exit at +2.4R locked in.",
+        "Price rises to ₹1,180, trailing stop moves to ₹1,120. "
+        "Price reverses to ₹1,118 → exit at +2.4R locked in.",
         "how_to_use": (
             "Never widen a trailing stop. Once it moves up, it doesn't come back down. "
             "Trail too tight = stopped out on normal noise. Trail too loose = give back too much. "
@@ -841,7 +840,7 @@ _TERMS: list[dict] = [
             "Drawn R:R is the payout schedule; actual outcome depends on whether the trade works."
         ),
         "example": "Entry ₹500, stop ₹485 (risk ₹15), T1 ₹550 (reward ₹50) → drawn R:R = 3.33×. "
-                   "Entry ₹500, stop ₹485, T1 ₹515 → drawn R:R = 1.0× (poor setup).",
+        "Entry ₹500, stop ₹485, T1 ₹515 → drawn R:R = 1.0× (poor setup).",
         "how_to_use": (
             "Drawn R:R ≥ 2.0× = good setup. The math works even at 40% win rate. "
             "Drawn R:R < 1.5× = marginal setup. Need >55% win rate to be profitable. "
@@ -864,7 +863,7 @@ _TERMS: list[dict] = [
             "Calibration n is the count of GPS tracks for your signal's specific bundle/regime combo."
         ),
         "example": "Signal n=8 → ignore the displayed win rate. It's noise. "
-                   "Signal n=84 → trust it. Use the displayed expectancy for sizing decisions.",
+        "Signal n=84 → trust it. Use the displayed expectancy for sizing decisions.",
         "how_to_use": (
             "n < 15: treat the signal as exploratory. Use minimum size. "
             "n 15–30: standard size. Keep accumulating data. "
@@ -890,7 +889,7 @@ _TERMS: list[dict] = [
             "Other signals on the same screen might be green even if this one is red — each is independent."
         ),
         "example": "INFY trend bundle: score 78, label BUY → enter on next pullback. "
-                   "RELIANCE breakout bundle: score 62, label WATCH → wait for the next pipeline run.",
+        "RELIANCE breakout bundle: score 62, label WATCH → wait for the next pipeline run.",
         "how_to_use": (
             "Only enter on BUY labels by default. BUY_WATCH = enter only with personal conviction at smaller size. "
             "WATCH/HOLD/AVOID = don't enter. "
@@ -915,7 +914,7 @@ _TERMS: list[dict] = [
             "Each state tells you exactly where you are in the journey."
         ),
         "example": "Trade opens at ₹1,000 → state OPEN. Price hits T1 at ₹1,100 → state T1_HIT, stop moves to ₹1,000. "
-                   "Price climbs to ₹1,180 then drops to ₹1,000 → trailing stop hits → state CLOSED_WIN.",
+        "Price climbs to ₹1,180 then drops to ₹1,000 → trailing stop hits → state CLOSED_WIN.",
         "how_to_use": (
             "OPEN positions still need active risk management — watch for the stop. "
             "T1_HIT positions are 'free shots' — let them ride to T2 unless thesis breaks. "
@@ -941,7 +940,7 @@ _TERMS: list[dict] = [
             "EXITED = sold the building. CONVERTED_TO_SWING = rented it out for short-term gains instead of holding long-term."
         ),
         "example": "HDFCBANK: tranche 1 at ₹1,650 → BUILDING. Tranche 5 at ₹1,580 → FULL. "
-                   "Q4 EPS drops 40% → Hard Avoid fires → PAUSED. Thesis confirmed broken → EXITED.",
+        "Q4 EPS drops 40% → Hard Avoid fires → PAUSED. Thesis confirmed broken → EXITED.",
         "how_to_use": (
             "BUILDING is the normal active state — keep adding on triggers. "
             "FULL means you can stop watching for new entries and switch to monitoring. "
@@ -965,7 +964,7 @@ _TERMS: list[dict] = [
             "Risk: trains can derail or reverse, so you keep a tight stop near the platform."
         ),
         "example": "INFY: EMAs stacked correctly, RSI 58, MACD positive, near 20-day high → trend signal. "
-                   "Stop just below the 20-day low (out of normal noise but tight enough to limit loss).",
+        "Stop just below the 20-day low (out of normal noise but tight enough to limit loss).",
         "how_to_use": (
             "Trend is the bread-and-butter bundle — highest signal frequency. "
             "Win rate typically 50–55%, expectancy 0.4–0.6R in BULL. "
@@ -985,7 +984,7 @@ _TERMS: list[dict] = [
             "and water rushes through. The volume surge is the evidence that the break is real, not a fake-out."
         ),
         "example": "TCS consolidates between ₹4,000–₹4,150 for 5 weeks. Closes at ₹4,170 on 2× volume → breakout. "
-                   "Stop at ₹4,090 (just inside the prior range).",
+        "Stop at ₹4,090 (just inside the prior range).",
         "how_to_use": (
             "Breakouts that fail (fall back into the range) are common — that's why volume matters. "
             "Low-volume breakouts have ~40% failure rate; high-volume have ~25%. "
@@ -1007,7 +1006,7 @@ _TERMS: list[dict] = [
             "You need disciplined stops because the strategy depends on infrequent big wins."
         ),
         "example": "Stock falls from ₹500 to ₹350. RSI hits 22. Next day price closes at ₹368 with a hammer candle → reversal signal. "
-                   "Stop at ₹345 (below the hammer low). T1 at ₹420 (R:R = 2.3×).",
+        "Stop at ₹345 (below the hammer low). T1 at ₹420 (R:R = 2.3×).",
         "how_to_use": (
             "Reversal needs the largest R:R cushion because of lower win rate. Don't take signals below 1.8× drawn R:R. "
             "Pair with quality fundamentals — reversals on broken businesses tend to keep falling. "
@@ -1028,7 +1027,7 @@ _TERMS: list[dict] = [
             "VCP catches stocks just before that release."
         ),
         "example": "Stock: ₹1,000 → drops to ₹850 (-15%) → recovers to ₹980 → drops to ₹880 (-10%) → recovers to ₹970 → "
-                   "drops to ₹915 (-6%). Each pullback is shallower. Breakout above ₹985 with volume = entry.",
+        "drops to ₹915 (-6%). Each pullback is shallower. Breakout above ₹985 with volume = entry.",
         "how_to_use": (
             "Rarest bundle — maybe 2–4 signals per Sunday run on the full NSE 500. "
             "Highest expectancy when it triggers (often 0.7R+ in BULL). "
@@ -1050,7 +1049,7 @@ _TERMS: list[dict] = [
             "Composite waits for that confirmation before acting."
         ),
         "example": "INFY shows Trend signal (score 70) AND Breakout signal (score 72) → Composite signal score 76. "
-                   "Higher than either alone; lower failure rate.",
+        "Higher than either alone; lower failure rate.",
         "how_to_use": (
             "Composite signals are the highest-conviction setups — full sizing is justified. "
             "Don't take Composite if you've already entered the underlying Trend or Breakout signal — same stock. "
@@ -1070,7 +1069,7 @@ _TERMS: list[dict] = [
             "institutional buyers take days to position. You ride that drift."
         ),
         "example": "Company X reports EPS ₹15 (estimate ₹12, beat by 25%), raises guidance, gaps up 4%. "
-                   "Buy at next day's open; drift typically continues 5–10 days.",
+        "Buy at next day's open; drift typically continues 5–10 days.",
         "how_to_use": (
             "Currently disabled in live sizing (spec C2 — paper-only). "
             "Don't manually override the gate. Once an earnings season's PEAD trades are net-positive with cost model on, "
@@ -1092,7 +1091,7 @@ _TERMS: list[dict] = [
             "with reliable data — hence the gating."
         ),
         "example": "Stock makes a sharp move down to sweep stops below a swing low, then reverses up strongly → "
-                   "liquidity sweep signal. Order block: a large bullish bar followed by 5+ bars of consolidation.",
+        "liquidity sweep signal. Order block: a large bullish bar followed by 5+ bars of consolidation.",
         "how_to_use": (
             "Don't trade SMC signals live. Use them as a confirmation lens for other bundle signals. "
             "Watch the Strategy Lab to see how SMC performs in backtests. If pooled OOS Sharpe > 0.6 across regimes, "
@@ -1114,7 +1113,7 @@ _TERMS: list[dict] = [
             "All combined into one number."
         ),
         "example": "Score 25/30: EMAs perfectly stacked, RSI 60, MACD positive crossover, 2× volume surge, near support. "
-                   "Score 12/30: EMAs mixed, RSI 45, weak volume → chart isn't supporting the thesis.",
+        "Score 12/30: EMAs mixed, RSI 45, weak volume → chart isn't supporting the thesis.",
         "how_to_use": (
             "Technical < 18 means the chart setup is mediocre. Even with high other pillars, the entry is risky. "
             "Look at the chart yourself when Technical is borderline. The number captures the rules — "
@@ -1135,7 +1134,7 @@ _TERMS: list[dict] = [
             "performing well in recent history. The score reflects 'how often this exact setup has paid off lately'."
         ),
         "example": "Trend bundle: 84 trades, expectancy 0.45R → Expectancy pillar = 21/25. "
-                   "Same bundle, 8 trades, expectancy 0.05R → pillar = 4/25 (low n + low expectancy).",
+        "Same bundle, 8 trades, expectancy 0.05R → pillar = 4/25 (low n + low expectancy).",
         "how_to_use": (
             "Expectancy < 10 = bundle isn't producing in this regime. Skip the signal or size down. "
             "Expectancy 18–25 = bundle is on a hot streak. Standard or slightly larger size. "
@@ -1157,7 +1156,7 @@ _TERMS: list[dict] = [
             "Crowded with locals (institutional buyers) is a stronger signal than tourist traffic."
         ),
         "example": "Delivery 65%, ADV use 180%, FII net buyers → Flow = 13/15. "
-                   "Delivery 35%, ADV use 90%, FII selling → Flow = 4/15.",
+        "Delivery 35%, ADV use 90%, FII selling → Flow = 4/15.",
         "how_to_use": (
             "Flow ≥ 10 = institutional confirmation. Bundle signals with strong Flow are highest conviction. "
             "Flow < 5 + a chart-only setup = often a retail-driven move. Tighter stops, smaller size. "
@@ -1178,7 +1177,7 @@ _TERMS: list[dict] = [
             "Sentiment doesn't decide the game — it adds context."
         ),
         "example": "3 broker upgrades in last 30 days + promoter bought ₹50 Cr → Sentiment = 4/5. "
-                   "No news, no insider activity → Sentiment = 1/5 (neutral).",
+        "No news, no insider activity → Sentiment = 1/5 (neutral).",
         "how_to_use": (
             "Sentiment 4–5 = a meaningful tailwind. Slight conviction boost. "
             "Sentiment ≤ 1 = neutral — don't weight it. "
@@ -1199,7 +1198,7 @@ _TERMS: list[dict] = [
             "Wear them in heavy rain (BEAR) and you'll slip. Regime Fit measures whether your bundle is dressed appropriately."
         ),
         "example": "Trend bundle in BULL regime → Regime Fit = 14/15. "
-                   "Trend bundle in BEAR regime → Regime Fit = 3/15 (system tells you it's not the right strategy).",
+        "Trend bundle in BEAR regime → Regime Fit = 3/15 (system tells you it's not the right strategy).",
         "how_to_use": (
             "Regime Fit < 8 is a major red flag — the bundle isn't suited to current conditions. "
             "If Regime Fit drops sharply between Sunday runs, the regime has likely shifted — review open positions. "
@@ -1219,7 +1218,7 @@ _TERMS: list[dict] = [
             "just confirmation there's no acute illness. Even chart-based swing trades benefit from skipping companies in obvious decline."
         ),
         "example": "ROE 18%, D/E 0.4, EPS growing → Fundamentals = 9/10. "
-                   "ROE -5%, D/E 2.8, EPS collapsing → Fundamentals = 1/10 (the chart may look good but business is broken).",
+        "ROE -5%, D/E 2.8, EPS collapsing → Fundamentals = 1/10 (the chart may look good but business is broken).",
         "how_to_use": (
             "Fundamentals < 5 + good Technical = possible 'dead cat bounce'. Trade smaller and tighter. "
             "Fundamentals 8–10 = even if held longer than intended, the underlying business won't catastrophically fail. "
@@ -1239,7 +1238,7 @@ _TERMS: list[dict] = [
             "and resold them outside. The actual attendees are the people who care about the event."
         ),
         "example": "Delivery 70% on 2× volume surge → strong institutional accumulation. "
-                   "Delivery 30% on 2× volume → speculative day-trading; less meaningful.",
+        "Delivery 30% on 2× volume → speculative day-trading; less meaningful.",
         "how_to_use": (
             "Delivery > 55% on volume surge = highest-quality entry signal. "
             "Delivery < 35% on volume surge = retail FOMO; expect a dip back. "
@@ -1260,7 +1259,7 @@ _TERMS: list[dict] = [
             "shows up as a chart bar. ADV use % tells you which pool you're in."
         ),
         "example": "Stock ADV: 5 lakh shares. Your order: 2,500 shares → ADV use 0.5% (no impact). "
-                   "Stock ADV: 1 lakh shares. Same 2,500-share order → ADV use 2.5% (some slippage expected).",
+        "Stock ADV: 1 lakh shares. Same 2,500-share order → ADV use 2.5% (some slippage expected).",
         "how_to_use": (
             "ADV use < 1% = safe. ADV use 1–3% = expect 5–10 bps slippage. ADV use > 5% = expect significant slippage. "
             "Universe (PIT) filters out stocks below a min ADV — but always check personally on the day of entry. "
@@ -1281,7 +1280,7 @@ _TERMS: list[dict] = [
             "is unreliable — it'll surprise you when you least expect it. Circuit-prone stocks are not for systematic trading."
         ),
         "example": "Microcap stock with 5 upper circuits + 3 lower circuits in 90 days → ⚠ chip shown. "
-                   "Large-cap like INFY: 0 circuit hits → no flag. Stable behaviour, suitable for systematic trades.",
+        "Large-cap like INFY: 0 circuit hits → no flag. Stable behaviour, suitable for systematic trades.",
         "how_to_use": (
             "Circuit hit warning visible → reduce position size by 50% minimum. "
             "More than 5 hits in 90 days → skip the trade. The stock's price action isn't reliable. "
@@ -1302,7 +1301,7 @@ _TERMS: list[dict] = [
             "they reset the entire price discovery."
         ),
         "example": "Trade signal on Jan 20, earnings on Jan 30. Hold expected 10 days → ⚠ earnings in window. "
-                   "Trade signal on Feb 5, earnings already on Jan 30 → no flag (results released).",
+        "Trade signal on Feb 5, earnings already on Jan 30 → no flag (results released).",
         "how_to_use": (
             "Earnings warning = either skip, or close before announcement, or use 50% size. "
             "Don't 'hope to be out by then' — you'll likely overshoot. "
@@ -1322,7 +1321,7 @@ _TERMS: list[dict] = [
             "and it closes for inspection, half your dinner plans are gone. Sector heat tracks the same concentration risk."
         ),
         "example": "Open: Trade A in HDFC Bank (1R), Trade B in ICICI Bank (1R) → Banking sector heat = 2R. "
-                   "Triggers warning at sector heat > 3R.",
+        "Triggers warning at sector heat > 3R.",
         "how_to_use": (
             "Sector heat > 3R = skip new signals in that sector even if score is high. "
             "Sector rotates suddenly; concentration risk amplifies losses. "
@@ -1342,7 +1341,7 @@ _TERMS: list[dict] = [
             "Now you know what to fix on the next test. Counterfactuals turn opaque scores into actionable feedback."
         ),
         "example": "'Score 71, would have been 78 (BUY) with delivery > 50%. Current delivery: 38% — "
-                   "watch for next 2–3 sessions; if delivery climbs above 50%, score will refresh on next pipeline run.'",
+        "watch for next 2–3 sessions; if delivery climbs above 50%, score will refresh on next pipeline run.'",
         "how_to_use": (
             "Read the counterfactual on every WATCH/BUY_WATCH signal — it tells you what to monitor. "
             "Don't act on a counterfactual prediction; wait for the next pipeline run to confirm. "
@@ -1363,7 +1362,7 @@ _TERMS: list[dict] = [
             "The chip is colour-coded so you can scan dozens of signals at a glance."
         ),
         "example": "Signal score 47 → grey chip 'Dead Zone'. Signal score 78 → green chip 'BUY'. "
-                   "Many WATCH-zone signals become BUY in the next run as conditions evolve.",
+        "Many WATCH-zone signals become BUY in the next run as conditions evolve.",
         "how_to_use": (
             "Sort signals by zone. Focus on Buy Zone first — those are the actionable ones. "
             "Watch Zone signals deserve a quick chart check — sometimes you'll see what the system missed. "
@@ -1384,7 +1383,7 @@ _TERMS: list[dict] = [
             "or wrong destination. Time itself is a signal."
         ),
         "example": "Bundle median time-to-T1: 7 days. Trade open 4 days → 57% elapsed (on track). "
-                   "Same trade at 14 days → 200% elapsed; usually a sign to exit even before stop hits.",
+        "Same trade at 14 days → 200% elapsed; usually a sign to exit even before stop hits.",
         "how_to_use": (
             "Elapsed > 150% on a trade still showing 0R: consider time-stop exit. "
             "Most bundles have a max hold (e.g. 21 days). After max hold, EXPIRED state auto-closes. "
@@ -1406,7 +1405,7 @@ _TERMS: list[dict] = [
             "Strategies that look profitable without cost model often go negative with it."
         ),
         "example": "Trade: buy ₹1L worth, sell ₹1.02L worth. Gross profit ₹2,000. "
-                   "Cost ₹350 (brokerage + STT + GST). Net profit ₹1,650.",
+        "Cost ₹350 (brokerage + STT + GST). Net profit ₹1,650.",
         "how_to_use": (
             "Always backtest with cost model ON. The 'Cost model' toggle in Strategy Lab exists for diagnostic comparison only. "
             "If a bundle is barely profitable without cost model, it's losing money with it. "
@@ -1427,7 +1426,7 @@ _TERMS: list[dict] = [
             "Anyone backtesting with Sunday-execution is cheating. Fill policy enforces market hours and realistic execution."
         ),
         "example": "Signal generated EOD Monday. Tuesday open gaps up 2%. ATR is 1.5% → gap > 0.5 ATR → fill skipped (gap-too-far). "
-                   "If gap is < 0.5 ATR, trade fills at Tuesday's open + slippage.",
+        "If gap is < 0.5 ATR, trade fills at Tuesday's open + slippage.",
         "how_to_use": (
             "Always keep Fill Policy ON in Strategy Lab. The 'off' toggle is for diagnosis only. "
             "Live trades automatically respect fill policy — you can't enter a signal that didn't fill the rules. "
@@ -1449,7 +1448,7 @@ _TERMS: list[dict] = [
             "Add up over 100 visits and it's significant."
         ),
         "example": "Expected entry ₹100.00, actual fill ₹100.08 → slippage = 8 bps. "
-                   "On 100 trades, 8 bps × 2 (round-trip) = 16 bps × 100 = 16% of capital eaten by slippage alone if uncontrolled.",
+        "On 100 trades, 8 bps × 2 (round-trip) = 16 bps × 100 = 16% of capital eaten by slippage alone if uncontrolled.",
         "how_to_use": (
             "Use limit orders for ADV use > 1%. Use market orders only in deep liquidity. "
             "If your post-mortem shows slippage_delta_bps consistently > 10, your execution needs improvement — "
@@ -1469,7 +1468,7 @@ _TERMS: list[dict] = [
             "Mock = the cookbook. Real = your kitchen. Compare both to learn whether your stove (broker) is hotter or cooler than standard."
         ),
         "example": "Mock fill: BUY 100 shares at ₹500.00 (model price). "
-                   "Real fill from broker: BUY 100 shares at ₹500.45. Slippage delta = 9 bps, tracked.",
+        "Real fill from broker: BUY 100 shares at ₹500.45. Slippage delta = 9 bps, tracked.",
         "how_to_use": (
             "Always log Real Fills via the 'Log entry fill' button on signals. "
             "Real fills create the actual trade record. Mocks only exist in backtest. "
@@ -1489,7 +1488,7 @@ _TERMS: list[dict] = [
             "Lookahead violations are subtle bugs that make backtests look magical — the system blocks and counts them."
         ),
         "example": "Backtest output: '0 lookahead violations' = clean. "
-                   "'8 violations' = bundle has a bug; fix before trusting the results.",
+        "'8 violations' = bundle has a bug; fix before trusting the results.",
         "how_to_use": (
             "Always check lookahead_violations is 0 in the Strategy Lab output. "
             "Non-zero = file a bug report. Don't trust the win rate or expectancy until fixed. "
@@ -1511,8 +1510,8 @@ _TERMS: list[dict] = [
             "Discipline beats greed. Cash is a position — and sometimes the best one."
         ),
         "example": "BULL + breadth confirmed + 6 signals → deploy 6, cash 0%. "
-                   "SIDEWAYS + 6 signals → deploy 3, cash 50%. "
-                   "BEAR + 6 signals → deploy 0, cash 100%.",
+        "SIDEWAYS + 6 signals → deploy 3, cash 50%. "
+        "BEAR + 6 signals → deploy 0, cash 100%.",
         "how_to_use": (
             "Always respect the cash decision. Don't 'force' more deployments. "
             "Cash sitting in the pool isn't lost — it's preserved for the next BULL regime. "
@@ -1534,7 +1533,7 @@ _TERMS: list[dict] = [
             "Once stable, full power resumes."
         ),
         "example": "Portfolio peak ₹10L. Drops to ₹9.2L (-8%). Size multiplier drops to 0.5×. "
-                   "Recovers to ₹9.4L, then ₹9.5L, then ₹9.7L (3 consecutive up days) → multiplier back to 1.0×.",
+        "Recovers to ₹9.4L, then ₹9.5L, then ₹9.7L (3 consecutive up days) → multiplier back to 1.0×.",
         "how_to_use": (
             "Don't override the governor. The math says smaller size after drawdowns improves recovery. "
             "If your drawdown is from a specific bundle failing (not the regime), pause that bundle manually. "
@@ -1554,7 +1553,7 @@ _TERMS: list[dict] = [
             "Until you beat it, you're in 'drawdown'. Beating it means making a new HWM."
         ),
         "example": "Portfolio: ₹10L → ₹11L (new HWM ₹11L) → ₹10.5L (drawdown -4.5% from HWM) → ₹11.2L (new HWM ₹11.2L). "
-                   "HWM only ratchets up.",
+        "HWM only ratchets up.",
         "how_to_use": (
             "Watch the gap between current NAV and HWM — that's your drawdown. "
             "When drawdown reaches certain thresholds, the Drawdown Governor activates. "
@@ -1578,7 +1577,7 @@ _TERMS: list[dict] = [
             "The big work happens once a week; the rest is upkeep."
         ),
         "example": "Sunday Run finds 8 BUY signals. Monday Revalidation drops 2 (gap-up made entry too expensive). "
-                   "User trades the remaining 6 throughout the week.",
+        "User trades the remaining 6 throughout the week.",
         "how_to_use": (
             "Trigger Sunday Run after market close Friday or any time Saturday/Sunday. "
             "Always wait for Monday Revalidation before placing orders — it filters stale signals. "
@@ -1598,7 +1597,7 @@ _TERMS: list[dict] = [
             "back to its specific production run. Useful when something goes wrong — you know which batch to recall."
         ),
         "example": "Sunday Run triggered → returns run_id '01HXYZ123ABCDEF'. "
-                   "All signals from that run share this ID; query the DB by run_id for the full batch.",
+        "All signals from that run share this ID; query the DB by run_id for the full batch.",
         "how_to_use": (
             "Mostly invisible during normal use. "
             "Useful for debugging: 'why did this signal appear?' — look up the run_id's details_json. "
@@ -1619,7 +1618,7 @@ _TERMS: list[dict] = [
             "should I do that automatically?'. You can say yes (auto-tune ON) or keep approving manually."
         ),
         "example": "Proposal: 'Trend signal threshold 70 → 72. Estimated impact: -8% signal count, +6% win rate, +0.15R expectancy.' "
-                   "Click 'Apply' to enact.",
+        "Click 'Apply' to enact.",
         "how_to_use": (
             "Keep auto-tune OFF initially — review proposals manually to learn the system. "
             "After ~3 months of stable performance, enable auto-tune for hands-off improvement. "
@@ -1641,7 +1640,7 @@ _TERMS: list[dict] = [
             "which players (bundles) performed, which need bench time. Postmortems institutionalise that review."
         ),
         "example": "Week ending 2026-01-12: +2.1R realized, 6 closed trades (4 wins, 2 losses). "
-                   "Trend bundle: 3 trades, +1.8R. Reversal: 3 trades, +0.3R. Nifty: +1.1% same week.",
+        "Trend bundle: 3 trades, +1.8R. Reversal: 3 trades, +0.3R. Nifty: +1.1% same week.",
         "how_to_use": (
             "Read every postmortem. If Plutus underperforms benchmarks 3+ weeks in a row, investigate. "
             "Compare bundle pull-through — consistently weak bundles deserve threshold tightening. "
@@ -1664,7 +1663,7 @@ _TERMS: list[dict] = [
             "vs lottery (random). You want to beat all three to know your edge is real, not lucky."
         ),
         "example": "Week: Plutus +3.2%, Nifty +1.1%, Regime-switched +0.8%, Random liquid -0.4%. "
-                   "Plutus beat all 3 → genuine edge that week.",
+        "Plutus beat all 3 → genuine edge that week.",
         "how_to_use": (
             "Plutus must beat all 4 benchmarks averaged over rolling 8 weeks for the go-live bar. "
             "Beating only Nifty isn't enough — random luck does that ~50% of the time. "
@@ -1685,7 +1684,7 @@ _TERMS: list[dict] = [
             "Profit Factor 2.0 means your winners are paying for losers twice over."
         ),
         "example": "30 closed trades. Wins total +25R, losses total -10R. PF = 2.5 (excellent). "
-                   "Same 30 trades, wins +12R, losses -15R. PF = 0.8 (losing strategy).",
+        "Same 30 trades, wins +12R, losses -15R. PF = 0.8 (losing strategy).",
         "how_to_use": (
             "PF > 2.0: strong strategy, maintain size. "
             "PF 1.2–2.0: marginal, watch closely. "
@@ -1708,8 +1707,8 @@ _TERMS: list[dict] = [
             "The decision is yours; the system flags the opportunity."
         ),
         "example": "Position in HDFCBANK accumulated at avg ₹1,580 over 5 tranches. "
-                   "Regime flips BULL, breakout signal appears at ₹1,720 → Bull-Ready badge shown. "
-                   "Convert: now a swing trade with stop at ₹1,650, T1 ₹1,800.",
+        "Regime flips BULL, breakout signal appears at ₹1,720 → Bull-Ready badge shown. "
+        "Convert: now a swing trade with stop at ₹1,650, T1 ₹1,800.",
         "how_to_use": (
             "Convert only if you intend to manage it as a swing (active stop, target). "
             "Don't convert just because the badge appears — the trade-off is that you cap upside at T2. "
@@ -1731,7 +1730,7 @@ _TERMS: list[dict] = [
             "PIT universe enforces authenticity in backtests."
         ),
         "example": "Backtesting 2020 → universe = NSE 500 constituents as of 2020 + their liquidity then. "
-                   "Includes Yes Bank (was in index then). Excludes Adani Green (joined later).",
+        "Includes Yes Bank (was in index then). Excludes Adani Green (joined later).",
         "how_to_use": (
             "PIT is automatic — you don't configure it. "
             "If a backtest looks too good to be true, ask: 'is this using PIT?'. "
@@ -1753,7 +1752,7 @@ _TERMS: list[dict] = [
             "Knowing this is happening before you accumulate is critical."
         ),
         "example": "Promoter pledge was 5% last year, now 22% → +17 pp jump → Hard Avoid fires. "
-                   "Even if business looks healthy, the structural risk is now elevated.",
+        "Even if business looks healthy, the structural risk is now elevated.",
         "how_to_use": (
             "Hard Avoid covers this automatically. Don't override unless you have specific knowledge. "
             "High pledge (>30%) historically correlates with corporate governance issues — "
@@ -1774,7 +1773,7 @@ _TERMS: list[dict] = [
             "Going concern is the same warning for businesses."
         ),
         "example": "Mid-cap pharma's annual report contains a going-concern note from auditor. "
-                   "Hard Avoid fires regardless of how undervalued the stock looks.",
+        "Hard Avoid fires regardless of how undervalued the stock looks.",
         "how_to_use": (
             "Always respect the going-concern flag. Most retail traders ignore this and get burned. "
             "If the company resolves the concern (raises capital, restructures), the flag clears in subsequent audits. "
@@ -1795,7 +1794,7 @@ _TERMS: list[dict] = [
             "Same destination, very different experience."
         ),
         "example": "RELIANCE: F&O listed, daily volume ₹2,500 Cr → tight execution. "
-                   "Smallcap XYZ: non-F&O, daily volume ₹15 Cr → wider spreads, more slippage.",
+        "Smallcap XYZ: non-F&O, daily volume ₹15 Cr → wider spreads, more slippage.",
         "how_to_use": (
             "Filter to F&O when execution quality matters most (Reversal bundle, larger position sizes). "
             "Accumulation can include non-F&O — long horizons absorb execution differences. "
@@ -1817,7 +1816,7 @@ _TERMS: list[dict] = [
             "Same with stocks — being at ATH is evidence of strength, not a warning sign."
         ),
         "example": "GRINDWELL near ATH with positive momentum, RSI 58, MACD strong → valid Trend signal. "
-                   "Just because price is high doesn't mean it's overpriced.",
+        "Just because price is high doesn't mean it's overpriced.",
         "how_to_use": (
             "Don't manually skip signals because the stock is 'near ATH'. "
             "Trust the bundle logic — extension checks happen via RSI and ATR bands. "
@@ -1839,7 +1838,7 @@ _TERMS: list[dict] = [
             "The total tells you overall quality; the pillar breakdown tells you the shape."
         ),
         "example": "Signal: Technical 24 + Expectancy 18 + Flow 12 + Sentiment 3 + Regime Fit 13 + Fundamentals 8 = 78. "
-                   "Above dead-zone threshold (65) → BUY label.",
+        "Above dead-zone threshold (65) → BUY label.",
         "how_to_use": (
             "Score above the buy-zone threshold = act. "
             "Two signals with same score can have very different pillar shapes — always check the breakdown. "
@@ -1862,7 +1861,7 @@ _TERMS: list[dict] = [
             "SPRT is more efficient than waiting for a predetermined sample size."
         ),
         "example": "Start: 'continue'. After 12 trades (9 wins): 'continue'. After 25 trades (18 wins): 'accept_H1'. "
-                   "Strategy is statistically proven. After 30 trades (10 wins, win rate dropping): 'accept_H0'. Pause strategy.",
+        "Strategy is statistically proven. After 30 trades (10 wins, win rate dropping): 'accept_H0'. Pause strategy.",
         "how_to_use": (
             "accept_H1: strong evidence the strategy works at its target win rate. Maintain or increase allocation. "
             "continue: gathering evidence. Stay at standard size. Don't change anything. "
@@ -1903,7 +1902,7 @@ def _badge(category: str) -> str:
     label = _CATEGORY_LABELS.get(category, category)
     return (
         f'<span style="background:{color}22; color:{color}; font-size:10px; '
-        f'font-weight:600; padding:2px 7px; border-radius:10px; '
+        f"font-weight:600; padding:2px 7px; border-radius:10px; "
         f'letter-spacing:0.03em; text-transform:uppercase;">{label}</span>'
     )
 
@@ -1914,9 +1913,15 @@ def _matches(term: dict, query: str) -> bool:
     q = query.lower()
     return any(
         q in str(v).lower()
-        for v in [term["name"], term["category"], term["one_liner"],
-                  term["detail"], term["analogy"], term.get("example", ""),
-                  term["how_to_use"]]
+        for v in [
+            term["name"],
+            term["category"],
+            term["one_liner"],
+            term["detail"],
+            term["analogy"],
+            term.get("example", ""),
+            term["how_to_use"],
+        ]
     )
 
 
@@ -1933,11 +1938,14 @@ def render(data: object = None) -> None:  # noqa: ARG001
 
     # Category filter
     all_cats = ["All"] + list(_CATEGORY_LABELS.values())
-    cat_filter = st.selectbox("Category", all_cats, key="glossary_cat", label_visibility="collapsed")
-    cat_key = {v: k for k, v in _CATEGORY_LABELS.items()}.get(cat_filter, None)
+    cat_filter = st.selectbox(
+        "Category", all_cats, key="glossary_cat", label_visibility="collapsed"
+    )
+    cat_key = {v: k for k, v in _CATEGORY_LABELS.items()}.get(cat_filter)
 
     filtered = [
-        t for t in _TERMS
+        t
+        for t in _TERMS
         if _matches(t, query.strip()) and (cat_key is None or t["category"] == cat_key)
     ]
 
@@ -1956,7 +1964,7 @@ def render(data: object = None) -> None:  # noqa: ARG001
             st.markdown(_badge(term["category"]), unsafe_allow_html=True)
             st.markdown(
                 f'<div style="font-size:14px; color:{TEXT_PRIMARY}; margin:10px 0 4px;">'
-                f'{term["one_liner"]}</div>',
+                f"{term['one_liner']}</div>",
                 unsafe_allow_html=True,
             )
 
@@ -1965,7 +1973,7 @@ def render(data: object = None) -> None:  # noqa: ARG001
                 f'<div style="font-size:11px; font-weight:600; color:{TEXT_TERTIARY}; '
                 f'text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px;">Detail</div>'
                 f'<div style="font-size:12px; color:{TEXT_SECONDARY}; line-height:1.6;">'
-                f'{term["detail"]}</div></div>',
+                f"{term['detail']}</div></div>",
                 unsafe_allow_html=True,
             )
 
@@ -1975,7 +1983,7 @@ def render(data: object = None) -> None:  # noqa: ARG001
                 f'<div style="font-size:11px; font-weight:600; color:{DEAD_ZONE}; '
                 f'text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px;">Think of it as…</div>'
                 f'<div style="font-size:12px; color:{TEXT_PRIMARY}; line-height:1.6;">'
-                f'{term["analogy"]}</div></div>',
+                f"{term['analogy']}</div></div>",
                 unsafe_allow_html=True,
             )
 
@@ -1986,7 +1994,7 @@ def render(data: object = None) -> None:  # noqa: ARG001
                     f'<div style="font-size:11px; font-weight:600; color:{TEXT_TERTIARY}; '
                     f'text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px;">Example</div>'
                     f'<div style="font-size:12px; color:{TEXT_SECONDARY}; line-height:1.6; font-family:monospace;">'
-                    f'{term["example"]}</div></div>',
+                    f"{term['example']}</div></div>",
                     unsafe_allow_html=True,
                 )
 
@@ -1996,6 +2004,6 @@ def render(data: object = None) -> None:  # noqa: ARG001
                 f'<div style="font-size:11px; font-weight:600; color:{BUY_GREEN}; '
                 f'text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px;">How to use this</div>'
                 f'<div style="font-size:12px; color:{TEXT_PRIMARY}; line-height:1.6;">'
-                f'{term["how_to_use"]}</div></div>',
+                f"{term['how_to_use']}</div></div>",
                 unsafe_allow_html=True,
             )

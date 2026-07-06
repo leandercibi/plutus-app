@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import date
-from typing import Any, cast, Optional
+from typing import TYPE_CHECKING, Any
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from sqlalchemy import select
@@ -23,12 +23,11 @@ from plutus.api.schemas.shared import (
     PortfolioSnapshotOut,
     PositionSnapshotOut,
     RegimeSnapshotOut,
-    RegimeVerdictOut,
     RunLogRowOut,
     RunOut,
 )
 from plutus.config.settings import Settings
-from plutus.data.providers.angelone_provider import RateLimitSaturated, USER_RATE_LIMIT_TIMEOUT
+from plutus.data.providers.angelone_provider import USER_RATE_LIMIT_TIMEOUT, RateLimitSaturated
 from plutus.db.models import (
     AccumulationPosition,
     CalibrationRow,
@@ -39,10 +38,12 @@ from plutus.db.models import (
     RunLogRow,
     SwingSignal,
     SwingTrade,
-    Tranche,
     Universe,
     WeeklyPostmortem,
 )
+
+if TYPE_CHECKING:
+    import pandas as pd
 
 router = APIRouter(prefix="/shared", tags=["shared"], dependencies=[Depends(require_token)])
 
@@ -60,11 +61,13 @@ def _resolve_run(idempotency_key: str | None) -> str:
     return run_id
 
 
-@router.get("/regime", response_model=Optional[RegimeSnapshotOut])
-def get_latest_regime(db: Session = Depends(get_db)) -> Optional[RegimeSnapshotOut]:
-    row = db.execute(
-        select(RegimeSnapshot).order_by(RegimeSnapshot.as_of_date.desc()).limit(1)
-    ).scalars().first()
+@router.get("/regime", response_model=RegimeSnapshotOut | None)
+def get_latest_regime(db: Session = Depends(get_db)) -> RegimeSnapshotOut | None:
+    row = (
+        db.execute(select(RegimeSnapshot).order_by(RegimeSnapshot.as_of_date.desc()).limit(1))
+        .scalars()
+        .first()
+    )
     if row is None:
         return None
     return RegimeSnapshotOut.model_validate(row, from_attributes=True)
@@ -75,9 +78,11 @@ def get_regime_history(
     days: int = Query(default=30, ge=1, le=3650),
     db: Session = Depends(get_db),
 ) -> list[RegimeSnapshotOut]:
-    rows = db.execute(
-        select(RegimeSnapshot).order_by(RegimeSnapshot.as_of_date.desc()).limit(days)
-    ).scalars().all()
+    rows = (
+        db.execute(select(RegimeSnapshot).order_by(RegimeSnapshot.as_of_date.desc()).limit(days))
+        .scalars()
+        .all()
+    )
     return [RegimeSnapshotOut.model_validate(r, from_attributes=True) for r in rows]
 
 
@@ -86,11 +91,15 @@ def get_universe(
     as_of: date = Query(...),
     db: Session = Depends(get_db),
 ) -> list[str]:
-    rows = db.execute(
-        select(Universe.symbol)
-        .where(Universe.as_of_date == as_of, Universe.in_universe.is_(True))
-        .order_by(Universe.symbol)
-    ).scalars().all()
+    rows = (
+        db.execute(
+            select(Universe.symbol)
+            .where(Universe.as_of_date == as_of, Universe.in_universe.is_(True))
+            .order_by(Universe.symbol)
+        )
+        .scalars()
+        .all()
+    )
     return list(rows)
 
 
@@ -103,11 +112,11 @@ def list_calibration(
     Used by the Calibration page to show pillar win-contribution charts
     and SPRT state for every active bundle.
     """
-    rows = db.execute(
-        select(CalibrationRow).order_by(
-            CalibrationRow.bucket, CalibrationRow.regime
-        )
-    ).scalars().all()
+    rows = (
+        db.execute(select(CalibrationRow).order_by(CalibrationRow.bucket, CalibrationRow.regime))
+        .scalars()
+        .all()
+    )
     return [CalibrationRowOut.model_validate(r, from_attributes=True) for r in rows]
 
 
@@ -117,11 +126,15 @@ def get_calibration(
     regime: str,
     db: Session = Depends(get_db),
 ) -> CalibrationRowOut:
-    row = db.execute(
-        select(CalibrationRow).where(
-            CalibrationRow.bucket == bucket, CalibrationRow.regime == regime
+    row = (
+        db.execute(
+            select(CalibrationRow).where(
+                CalibrationRow.bucket == bucket, CalibrationRow.regime == regime
+            )
         )
-    ).scalars().first()
+        .scalars()
+        .first()
+    )
     if row is None:
         raise HTTPException(status_code=404, detail="no calibration row")
     return CalibrationRowOut.model_validate(row, from_attributes=True)
@@ -138,11 +151,7 @@ def list_run_log(
     Used by the Dashboard to show last pipeline run status and timing.
     Ordered by most-recent first.
     """
-    stmt = (
-        select(RunLogRow)
-        .order_by(RunLogRow.started_at.desc())
-        .limit(limit)
-    )
+    stmt = select(RunLogRow).order_by(RunLogRow.started_at.desc()).limit(limit)
     if job_name is not None:
         stmt = stmt.where(RunLogRow.job_name == job_name)
     rows = db.execute(stmt).scalars().all()
@@ -151,9 +160,11 @@ def list_run_log(
 
 @router.get("/benchmarks/latest", response_model=BenchmarkResultOut)
 def get_latest_benchmarks(db: Session = Depends(get_db)) -> BenchmarkResultOut:
-    row = db.execute(
-        select(WeeklyPostmortem).order_by(WeeklyPostmortem.week_ending.desc()).limit(1)
-    ).scalars().first()
+    row = (
+        db.execute(select(WeeklyPostmortem).order_by(WeeklyPostmortem.week_ending.desc()).limit(1))
+        .scalars()
+        .first()
+    )
     if row is None:
         raise HTTPException(status_code=404, detail="no postmortem")
     # WeeklyPostmortem persists net-return columns only; profit factor and trade count
@@ -170,9 +181,9 @@ def get_latest_benchmarks(db: Session = Depends(get_db)) -> BenchmarkResultOut:
     )
 
 
-def _add_indicators(df: "pd.DataFrame") -> "pd.DataFrame":
+def _add_indicators(df: pd.DataFrame) -> pd.DataFrame:
     """Compute all chart overlay indicators in-place and return df."""
-    import numpy as np
+
     close = df["close"]
     df["dma20"] = close.rolling(20).mean()
     df["dma50"] = close.rolling(50).mean()
@@ -194,17 +205,17 @@ def _add_indicators(df: "pd.DataFrame") -> "pd.DataFrame":
     df["ema55"] = close.ewm(span=55, adjust=False).mean()
     dma20_prev = df["dma20"].shift(1)
     dma50_prev = df["dma50"].shift(1)
-    df["golden_cross_20_50"] = (
-        (df["dma20"] > df["dma50"]) & (dma20_prev <= dma50_prev)
-    ).fillna(False)
+    df["golden_cross_20_50"] = ((df["dma20"] > df["dma50"]) & (dma20_prev <= dma50_prev)).fillna(
+        False
+    )
     return df
 
 
-def _df_to_bars(df: "pd.DataFrame", is_intraday: bool = False) -> "list[ChartBarOut]":
+def _df_to_bars(df: pd.DataFrame, is_intraday: bool = False) -> list[ChartBarOut]:
     import numpy as np
     import pandas as pd
 
-    def _safe(v: object) -> float | None:
+    def _safe(v: Any) -> float | None:
         if v is None or (isinstance(v, float) and np.isnan(v)):
             return None
         return float(v)
@@ -213,29 +224,31 @@ def _df_to_bars(df: "pd.DataFrame", is_intraday: bool = False) -> "list[ChartBar
     for _, row in df.iterrows():
         ts = pd.Timestamp(row["date"])
         date_str = ts.isoformat() if is_intraday else ts.date().isoformat()
-        bars.append(ChartBarOut(
-            date=date_str,
-            open=row["open"],
-            high=row["high"],
-            low=row["low"],
-            close=row["close"],
-            volume=row["volume"],
-            dma20=_safe(row.get("dma20")),
-            dma50=_safe(row.get("dma50")),
-            dma200=_safe(row.get("dma200")),
-            macd=_safe(row.get("macd")),
-            macd_signal=_safe(row.get("macd_signal")),
-            macd_hist=_safe(row.get("macd_hist")),
-            bb_upper=_safe(row.get("bb_upper")),
-            bb_lower=_safe(row.get("bb_lower")),
-            bb_mid=_safe(row.get("bb_mid")),
-            ema8=_safe(row.get("ema8")),
-            ema13=_safe(row.get("ema13")),
-            ema21=_safe(row.get("ema21")),
-            ema34=_safe(row.get("ema34")),
-            ema55=_safe(row.get("ema55")),
-            golden_cross_20_50=bool(row.get("golden_cross_20_50", False)),
-        ))
+        bars.append(
+            ChartBarOut(
+                date=date_str,
+                open=row["open"],
+                high=row["high"],
+                low=row["low"],
+                close=row["close"],
+                volume=row["volume"],
+                dma20=_safe(row.get("dma20")),
+                dma50=_safe(row.get("dma50")),
+                dma200=_safe(row.get("dma200")),
+                macd=_safe(row.get("macd")),
+                macd_signal=_safe(row.get("macd_signal")),
+                macd_hist=_safe(row.get("macd_hist")),
+                bb_upper=_safe(row.get("bb_upper")),
+                bb_lower=_safe(row.get("bb_lower")),
+                bb_mid=_safe(row.get("bb_mid")),
+                ema8=_safe(row.get("ema8")),
+                ema13=_safe(row.get("ema13")),
+                ema21=_safe(row.get("ema21")),
+                ema34=_safe(row.get("ema34")),
+                ema55=_safe(row.get("ema55")),
+                golden_cross_20_50=bool(row.get("golden_cross_20_50", False)),
+            )
+        )
     return bars
 
 
@@ -248,8 +261,6 @@ def get_chart(
 ) -> ChartDataOut:
     from datetime import timedelta
 
-    import pandas as pd
-
     from plutus.config.settings import get_settings
     from plutus.data.providers.yfinance_provider import YFinanceProvider
 
@@ -259,10 +270,17 @@ def get_chart(
     start = end - timedelta(days=fetch_days)
     settings = get_settings()
     df = None
-    if all([settings.angel_api_key, settings.angel_client_id,
-            settings.angel_password, settings.angel_totp_secret]):
+    if all(
+        [
+            settings.angel_api_key,
+            settings.angel_client_id,
+            settings.angel_password,
+            settings.angel_totp_secret,
+        ]
+    ):
         try:
             from plutus.data.providers.angelone_provider import AngelOneProvider
+
             angel = AngelOneProvider(
                 api_key=settings.angel_api_key,
                 client_id=settings.angel_client_id,
@@ -296,14 +314,17 @@ def get_chart(
     # --- Intraday bars (Angel One ONE_HOUR, 60 days) ---
     # Fetched once and cached on the client; duration switches are client-side slices.
     intraday_bars: list[ChartBarOut] = []
-    if all([
-        settings.angel_api_key,
-        settings.angel_client_id,
-        settings.angel_password,
-        settings.angel_totp_secret,
-    ]):
+    if all(
+        [
+            settings.angel_api_key,
+            settings.angel_client_id,
+            settings.angel_password,
+            settings.angel_totp_secret,
+        ]
+    ):
         try:
             from plutus.data.providers.angelone_provider import AngelOneProvider
+
             angel = AngelOneProvider(
                 api_key=settings.angel_api_key,
                 client_id=settings.angel_client_id,
@@ -347,7 +368,7 @@ def get_ltp(
     symbol: str,
     settings: Settings = Depends(get_app_settings),
     db: Session = Depends(get_db),
-) -> dict:
+) -> dict[str, Any]:
     """Return latest traded price for a single symbol. Used by fill forms."""
     prices = _fetch_live_prices({symbol.upper()}, settings, db)
     price = prices.get(symbol.upper())
@@ -514,31 +535,40 @@ def _fetch_live_prices(
     # the portfolio snapshot is never silently empty when live sources are down.
     still_missing = symbols - prices.keys()
     if still_missing:
-        cached_rows = db.execute(
-            select(LatestPrice).where(LatestPrice.symbol.in_(still_missing))
-        ).scalars().all()
+        cached_rows = (
+            db.execute(select(LatestPrice).where(LatestPrice.symbol.in_(still_missing)))
+            .scalars()
+            .all()
+        )
         for row in cached_rows:
             prices[row.symbol] = float(row.price)
-            logger.info("using_cached_price: %s = %.2f (from %s)", row.symbol, float(row.price), row.fetched_at)
+            logger.info(
+                "using_cached_price: %s = %.2f (from %s)",
+                row.symbol,
+                float(row.price),
+                row.fetched_at,
+            )
 
     now = datetime.utcnow()
     for sym, price in prices.items():
         # Only write back to cache if the price came from a live source
         if sym not in still_missing:
-            row = db.execute(
-                select(LatestPrice).where(LatestPrice.symbol == sym)
-            ).scalars().first()
-            if row:
-                row.price = D(str(round(price, 2)))
-                row.source = source
-                row.fetched_at = now
+            existing = (
+                db.execute(select(LatestPrice).where(LatestPrice.symbol == sym)).scalars().first()
+            )
+            if existing:
+                existing.price = D(str(round(price, 2)))
+                existing.source = source
+                existing.fetched_at = now
             else:
-                db.add(LatestPrice(
-                    symbol=sym,
-                    price=D(str(round(price, 2))),
-                    source=source,
-                    fetched_at=now,
-                ))
+                db.add(
+                    LatestPrice(
+                        symbol=sym,
+                        price=D(str(round(price, 2))),
+                        source=source,
+                        fetched_at=now,
+                    )
+                )
     db.flush()
     return prices
 
@@ -563,16 +593,20 @@ def compute_portfolio_snapshot(db: Session, settings: Settings) -> PortfolioSnap
     total_invested = 0.0
     total_current = 0.0
 
-    open_trades = db.execute(
-        select(SwingTrade).where(SwingTrade.state.in_(["OPEN", "T1_HIT"]))
-    ).scalars().all()
+    open_trades = (
+        db.execute(select(SwingTrade).where(SwingTrade.state.in_(["OPEN", "T1_HIT"])))
+        .scalars()
+        .all()
+    )
 
     symbols_needed = {t.symbol for t in open_trades}
-    accum_positions = db.execute(
-        select(AccumulationPosition).where(
-            AccumulationPosition.state.in_(["BUILDING", "FULL"])
+    accum_positions = (
+        db.execute(
+            select(AccumulationPosition).where(AccumulationPosition.state.in_(["BUILDING", "FULL"]))
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     symbols_needed.update(p.symbol for p in accum_positions)
 
     prices = _fetch_live_prices(symbols_needed, settings, db)
@@ -582,12 +616,16 @@ def compute_portfolio_snapshot(db: Session, settings: Settings) -> PortfolioSnap
         price = prices.get(trade.symbol)
         if price is None or signal is None:
             continue
-        entry_fills = db.execute(
-            select(Fill).where(
-                Fill.trade_id == trade.id,
-                Fill.side == "BUY",
+        entry_fills = (
+            db.execute(
+                select(Fill).where(
+                    Fill.trade_id == trade.id,
+                    Fill.side == "BUY",
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         if not entry_fills:
             avg_cost = float(signal.entry)
         else:
@@ -600,17 +638,19 @@ def compute_portfolio_snapshot(db: Session, settings: Settings) -> PortfolioSnap
         total_current += current
         sl = float(signal.stop_loss)
         sl_dist = ((price - sl) / price) * 100 if price > 0 else None
-        positions.append(PositionSnapshotOut(
-            symbol=trade.symbol,
-            mode="swing",
-            qty=trade.qty,
-            avg_cost=round(avg_cost, 2),
-            current_price=round(price, 2),
-            pnl=round(current - invested, 2),
-            pnl_pct=round(((current - invested) / invested) * 100, 2) if invested else 0.0,
-            stop_loss=sl,
-            sl_distance_pct=round(sl_dist, 2) if sl_dist is not None else None,
-        ))
+        positions.append(
+            PositionSnapshotOut(
+                symbol=trade.symbol,
+                mode="swing",
+                qty=trade.qty,
+                avg_cost=round(avg_cost, 2),
+                current_price=round(price, 2),
+                pnl=round(current - invested, 2),
+                pnl_pct=round(((current - invested) / invested) * 100, 2) if invested else 0.0,
+                stop_loss=sl,
+                sl_distance_pct=round(sl_dist, 2) if sl_dist is not None else None,
+            )
+        )
 
     for pos in accum_positions:
         price = prices.get(pos.symbol)
@@ -621,15 +661,17 @@ def compute_portfolio_snapshot(db: Session, settings: Settings) -> PortfolioSnap
         current = price * pos.qty_total
         total_invested += invested
         total_current += current
-        positions.append(PositionSnapshotOut(
-            symbol=pos.symbol,
-            mode="accumulation",
-            qty=pos.qty_total,
-            avg_cost=round(avg_cost, 2),
-            current_price=round(price, 2),
-            pnl=round(current - invested, 2),
-            pnl_pct=round(((current - invested) / invested) * 100, 2) if invested else 0.0,
-        ))
+        positions.append(
+            PositionSnapshotOut(
+                symbol=pos.symbol,
+                mode="accumulation",
+                qty=pos.qty_total,
+                avg_cost=round(avg_cost, 2),
+                current_price=round(price, 2),
+                pnl=round(current - invested, 2),
+                pnl_pct=round(((current - invested) / invested) * 100, 2) if invested else 0.0,
+            )
+        )
 
     pnl = total_current - total_invested
     return PortfolioSnapshotOut(
@@ -653,16 +695,20 @@ def run_hourly_price_check(
     now = datetime.utcnow()
     created_count = 0
 
-    open_trades = db.execute(
-        select(SwingTrade).where(SwingTrade.state.in_(["OPEN", "T1_HIT"]))
-    ).scalars().all()
+    open_trades = (
+        db.execute(select(SwingTrade).where(SwingTrade.state.in_(["OPEN", "T1_HIT"])))
+        .scalars()
+        .all()
+    )
     symbols_needed = {t.symbol for t in open_trades}
 
-    accum_positions = db.execute(
-        select(AccumulationPosition).where(
-            AccumulationPosition.state.in_(["BUILDING", "FULL"])
+    accum_positions = (
+        db.execute(
+            select(AccumulationPosition).where(AccumulationPosition.state.in_(["BUILDING", "FULL"]))
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     symbols_needed.update(p.symbol for p in accum_positions)
 
     prices = _fetch_live_prices(symbols_needed, settings, db)
@@ -683,45 +729,57 @@ def run_hourly_price_check(
         sl_distance_pct = ((price - sl) / price) * 100 if price > 0 else 100
 
         if sl_distance_pct <= 3.0:
-            recent = db.execute(
-                select(Notification).where(
-                    Notification.symbol == trade.symbol,
-                    Notification.kind == "SL_PROXIMITY",
-                    Notification.dismissed.is_(False),
-                    Notification.created_at >= now - timedelta(hours=2),
+            recent = (
+                db.execute(
+                    select(Notification).where(
+                        Notification.symbol == trade.symbol,
+                        Notification.kind == "SL_PROXIMITY",
+                        Notification.dismissed.is_(False),
+                        Notification.created_at >= now - timedelta(hours=2),
+                    )
                 )
-            ).scalars().first()
+                .scalars()
+                .first()
+            )
             if recent is None:
-                db.add(Notification(
-                    kind="SL_PROXIMITY",
-                    severity="URGENT" if sl_distance_pct <= 1.0 else "WARNING",
-                    title=f"{trade.symbol} near stop loss",
-                    body=f"Price ₹{price:,.2f} is {sl_distance_pct:.1f}% from SL ₹{sl:,.2f}",
-                    symbol=trade.symbol,
-                    created_at=now,
-                ))
+                db.add(
+                    Notification(
+                        kind="SL_PROXIMITY",
+                        severity="URGENT" if sl_distance_pct <= 1.0 else "WARNING",
+                        title=f"{trade.symbol} near stop loss",
+                        body=f"Price ₹{price:,.2f} is {sl_distance_pct:.1f}% from SL ₹{sl:,.2f}",
+                        symbol=trade.symbol,
+                        created_at=now,
+                    )
+                )
                 created_count += 1
 
         t1 = float(signal.target_1)
         t1_distance_pct = ((t1 - price) / price) * 100 if price > 0 else 100
         if t1_distance_pct <= 2.0 and trade.state == "OPEN":
-            recent = db.execute(
-                select(Notification).where(
-                    Notification.symbol == trade.symbol,
-                    Notification.kind == "T1_PROXIMITY",
-                    Notification.dismissed.is_(False),
-                    Notification.created_at >= now - timedelta(hours=2),
+            recent = (
+                db.execute(
+                    select(Notification).where(
+                        Notification.symbol == trade.symbol,
+                        Notification.kind == "T1_PROXIMITY",
+                        Notification.dismissed.is_(False),
+                        Notification.created_at >= now - timedelta(hours=2),
+                    )
                 )
-            ).scalars().first()
+                .scalars()
+                .first()
+            )
             if recent is None:
-                db.add(Notification(
-                    kind="T1_PROXIMITY",
-                    severity="INFO",
-                    title=f"{trade.symbol} approaching T1",
-                    body=f"Price ₹{price:,.2f} is {t1_distance_pct:.1f}% from T1 ₹{t1:,.2f}",
-                    symbol=trade.symbol,
-                    created_at=now,
-                ))
+                db.add(
+                    Notification(
+                        kind="T1_PROXIMITY",
+                        severity="INFO",
+                        title=f"{trade.symbol} approaching T1",
+                        body=f"Price ₹{price:,.2f} is {t1_distance_pct:.1f}% from T1 ₹{t1:,.2f}",
+                        symbol=trade.symbol,
+                        created_at=now,
+                    )
+                )
                 created_count += 1
 
     db.flush()
@@ -757,7 +815,7 @@ def dismiss_notification(
 @router.post("/test-telegram")
 def test_telegram(
     settings: Settings = Depends(get_app_settings),
-    session: object = Depends(get_db),
+    session: Session = Depends(get_db),
 ) -> dict[str, object]:
     if settings.telegram_bot_token is None:
         return {"sent": False, "reason": "no telegram token configured"}
@@ -765,6 +823,7 @@ def test_telegram(
 
     from plutus.alerts.channels import AlertMessage
     from plutus.alerts.factory import build_alert_monitor
+
     monitor = build_alert_monitor(settings)
     monitor.emit(
         AlertMessage(

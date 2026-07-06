@@ -28,7 +28,5 @@ class PositionSizer:
         if risk_per_share <= 0:
             raise ValueError("entry must exceed stop_loss for a long")
         qty_by_risk = risk_per_trade_inr / risk_per_share
-        qty_by_adv = Decimal(adv_20d) * Decimal(
-            str(self._settings.max_position_pct_of_adv)
-        )
+        qty_by_adv = Decimal(adv_20d) * Decimal(str(self._settings.max_position_pct_of_adv))
         return int(min(qty_by_risk, qty_by_adv))

@@ -42,9 +42,7 @@ class SectorCap:
 
         if proposed_value_inr is not None and pool_value_inr > 0:
             existing_value = sum(
-                p.position_value_inr
-                for p in same_sector
-                if p.position_value_inr is not None
+                p.position_value_inr for p in same_sector if p.position_value_inr is not None
             )
             projected_value = existing_value + proposed_value_inr
             exposure_pct = projected_value / float(pool_value_inr)

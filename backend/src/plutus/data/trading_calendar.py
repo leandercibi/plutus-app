@@ -27,20 +27,20 @@ _NSE_HOLIDAYS_2026: frozenset[date] = frozenset(
     {
         date(2026, 1, 26),  # Republic Day
         date(2026, 2, 17),  # Mahashivratri
-        date(2026, 3, 4),   # Holi
+        date(2026, 3, 4),  # Holi
         date(2026, 3, 20),  # Id-Ul-Fitr (Ramzan Id)
-        date(2026, 4, 3),   # Good Friday
+        date(2026, 4, 3),  # Good Friday
         date(2026, 4, 11),  # Mahavir Jayanti (Swaminarayan Jayanti)
         date(2026, 4, 14),  # Dr. Ambedkar Jayanti
-        date(2026, 5, 1),   # Maharashtra Day
+        date(2026, 5, 1),  # Maharashtra Day
         date(2026, 6, 26),  # Id-Ul-Adha (Bakri Eid) — confirmed: NSE closed, no yfinance data
         date(2026, 8, 15),  # Independence Day
         date(2026, 8, 19),  # Ganesh Chaturthi
         date(2026, 10, 2),  # Gandhi Jayanti
-        date(2026, 10, 20), # Diwali Laxmi Pujan (Lakshmi Puja)
-        date(2026, 10, 21), # Diwali Balipratipada
-        date(2026, 10, 25), # Guru Nanak Jayanti
-        date(2026, 12, 25), # Christmas
+        date(2026, 10, 20),  # Diwali Laxmi Pujan (Lakshmi Puja)
+        date(2026, 10, 21),  # Diwali Balipratipada
+        date(2026, 10, 25),  # Guru Nanak Jayanti
+        date(2026, 12, 25),  # Christmas
     }
 )
 

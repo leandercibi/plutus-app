@@ -46,9 +46,7 @@ def build_accumulation_postmortem_md(inputs: AccumulationPostmortemInputs) -> st
             thesis = "intact" if p.thesis_intact else "broken"
             rs = f"{p.rs_30:.0%}/{p.rs_90:.0%}/{p.rs_180:.0%}"
             tranches = f"{p.tranches_filled}/{p.tranches_total}"
-            lines.append(
-                f"| {p.symbol} | {p.state} | {thesis} | {rs} | {tranches} |"
-            )
+            lines.append(f"| {p.symbol} | {p.state} | {thesis} | {rs} | {tranches} |")
     else:
         lines.append("none")
     lines.append("")

@@ -40,6 +40,7 @@ def _zero_benchmarks() -> BenchmarkResult:
 def load_home(session: Session, settings: Settings | None = None) -> HomeView:
     if settings is None:
         from plutus.config.settings import get_settings
+
         settings = get_settings()
     regime_row = (
         session.query(models.RegimeSnapshot)
@@ -124,6 +125,7 @@ def load_home(session: Session, settings: Settings | None = None) -> HomeView:
     ]
     # Allocated capital: swing = BUY fills on currently-open trades only
     from plutus.db.models import Fill, SwingTrade
+
     swing_fills = (
         session.query(Fill)
         .join(SwingTrade, Fill.trade_id == SwingTrade.id)
@@ -131,9 +133,7 @@ def load_home(session: Session, settings: Settings | None = None) -> HomeView:
         .all()
     )
     swing_allocated = sum(Decimal(str(f.qty)) * f.price for f in swing_fills)
-    accum_allocated = sum(
-        p.avg_cost * Decimal(p.qty_total) for p in accum_positions
-    )
+    accum_allocated = sum(p.avg_cost * Decimal(p.qty_total) for p in accum_positions)
     total_capital = Decimal(str(settings.total_capital_inr))
     return HomeView(
         total_capital=total_capital,
@@ -251,9 +251,7 @@ def load_candidates(session: Session) -> list[CandidateView]:
         .filter(models.AccumulationPosition.state.in_(["BUILDING", "FULL", "PAUSED"]))
         .all()
     )
-    pos_by_symbol: dict[str, models.AccumulationPosition] = {
-        p.symbol: p for p in active_positions
-    }
+    pos_by_symbol: dict[str, models.AccumulationPosition] = {p.symbol: p for p in active_positions}
     # Count filled tranches per position
     filled_counts: dict[int, int] = {}
     if active_positions:
@@ -289,24 +287,26 @@ def load_candidates(session: Session) -> list[CandidateView]:
             hard_avoid_reasons = list(r.hard_avoid_reasons_json or ["hard avoid active"])
 
         pos = pos_by_symbol.get(r.symbol)
-        out.append(CandidateView(
-            symbol=r.symbol,
-            label=r.label or "WATCH",
-            quality=quality,
-            growth=growth,
-            valuation=valuation,
-            rs_blend=rs_blend,
-            rs_30=r.rs_30,
-            rs_90=r.rs_90,
-            rs_180=r.rs_180,
-            cagr_eps_3y=r.cagr_eps_3y or 0.0,
-            cagr_eps_5y=r.cagr_eps_5y or 0.0,
-            valuation_capped=valuation >= 30,
-            hard_avoid_reasons=hard_avoid_reasons,
-            position_id=pos.id if pos else None,
-            tranches_filled=filled_counts.get(pos.id, 0) if pos else 0,
-            total_tranches=5,
-        ))
+        out.append(
+            CandidateView(
+                symbol=r.symbol,
+                label=r.label or "WATCH",
+                quality=quality,
+                growth=growth,
+                valuation=valuation,
+                rs_blend=rs_blend,
+                rs_30=r.rs_30,
+                rs_90=r.rs_90,
+                rs_180=r.rs_180,
+                cagr_eps_3y=r.cagr_eps_3y or 0.0,
+                cagr_eps_5y=r.cagr_eps_5y or 0.0,
+                valuation_capped=valuation >= 30,
+                hard_avoid_reasons=hard_avoid_reasons,
+                position_id=pos.id if pos else None,
+                tranches_filled=filled_counts.get(pos.id, 0) if pos else 0,
+                total_tranches=5,
+            )
+        )
     return out
 
 
@@ -358,15 +358,14 @@ def load_calibration(session: Session, settings: Settings) -> CalibrationView:
         )
         for r in rows
     ]
-    return CalibrationView(
-        lines=lines, proposals=[], auto_tune_enabled=settings.auto_tune_enabled
-    )
+    return CalibrationView(lines=lines, proposals=[], auto_tune_enabled=settings.auto_tune_enabled)
 
 
 def _compute_bundle_rows(session: Session) -> list:
     """Compute per-bundle stats from all closed trades joined to their signals."""
-    from collections import defaultdict
     import math
+    from collections import defaultdict
+
     from plutus.dashboard.data import PostmortemBundleRow
 
     closed_trades = (
@@ -390,19 +389,22 @@ def _compute_bundle_rows(session: Session) -> list:
         # Wilson-style CI using normal approx on R values
         std = (sum((r - exp) ** 2 for r in rs) / n) ** 0.5 if n > 1 else 0.0
         margin = 1.96 * std / math.sqrt(n) if n > 1 else std
-        rows.append(PostmortemBundleRow(
-            bundle=bundle,
-            n_trades=n,
-            win_rate=win_rate,
-            ci_low_R=round(exp - margin, 2),
-            ci_high_R=round(exp + margin, 2),
-            expectancy_R=round(exp, 2),
-        ))
+        rows.append(
+            PostmortemBundleRow(
+                bundle=bundle,
+                n_trades=n,
+                win_rate=win_rate,
+                ci_low_R=round(exp - margin, 2),
+                ci_high_R=round(exp + margin, 2),
+                expectancy_R=round(exp, 2),
+            )
+        )
     return rows
 
 
 def _most_recent_friday() -> str:
     from datetime import date, timedelta
+
     today = date.today()
     # weekday(): Monday=0 … Friday=4 … Sunday=6
     days_since_friday = (today.weekday() - 4) % 7
@@ -460,12 +462,7 @@ def load_postmortem(session: Session) -> PostmortemView:
 def load_user_flow(session: Session) -> UserFlowView:
     from plutus.db.models import RunLogRow
 
-    rows = (
-        session.query(RunLogRow)
-        .order_by(RunLogRow.started_at.desc())
-        .limit(20)
-        .all()
-    )
+    rows = session.query(RunLogRow).order_by(RunLogRow.started_at.desc()).limit(20).all()
     return UserFlowView(
         run_log=[
             RunLogRowView(
@@ -530,9 +527,7 @@ def _load_universe_symbols() -> list[str]:
                     return sorted(set(syms))
             f.seek(0)
             syms = [
-                line.strip()
-                for line in f
-                if line.strip() and not line.lower().startswith("symbol")
+                line.strip() for line in f if line.strip() and not line.lower().startswith("symbol")
             ]
             if syms:
                 return sorted(set(syms))

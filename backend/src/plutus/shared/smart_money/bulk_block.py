@@ -42,9 +42,7 @@ class BulkBlockSignal:
     """Net institutional buying on bulk/block deals over the last N sessions
     raises the score; promoter selling drags it down."""
 
-    def compute(
-        self, events: list[BulkBlockEvent], lookback_sessions: int = 10
-    ) -> BulkBlockScore:
+    def compute(self, events: list[BulkBlockEvent], lookback_sessions: int = 10) -> BulkBlockScore:
         if not events:
             return BulkBlockScore(0, "UNKNOWN", Decimal("0"))
 
@@ -63,17 +61,13 @@ class BulkBlockSignal:
 
         net_value = net_institutional - promoter_selling
         score = self._score(net_institutional, promoter_selling)
-        return BulkBlockScore(
-            score_0_15=score, buyer_class=dominant, net_value_inr=net_value
-        )
+        return BulkBlockScore(score_0_15=score, buyer_class=dominant, net_value_inr=net_value)
 
     @staticmethod
     def _dominant_buyer(events: list[BulkBlockEvent]) -> BuyerClass:
         totals: dict[BuyerClass, Decimal] = {}
         for e in events:
-            totals[e.buyer_class] = (
-                totals.get(e.buyer_class, Decimal("0")) + e.value_inr
-            )
+            totals[e.buyer_class] = totals.get(e.buyer_class, Decimal("0")) + e.value_inr
         return max(totals, key=lambda k: totals[k])
 
     @staticmethod

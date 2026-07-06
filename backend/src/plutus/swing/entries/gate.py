@@ -81,10 +81,7 @@ class EntryGate:
         # 2. Earnings (B6) — adjusts, never kills
         adjusted = signal
         earnings_adj = self._earnings.evaluate(signal, ctx.earnings_in_window, ctx.atr)
-        if (
-            earnings_adj.action == "widen_stop"
-            and earnings_adj.adjusted_stop is not None
-        ):
+        if earnings_adj.action == "widen_stop" and earnings_adj.adjusted_stop is not None:
             adjusted = dataclasses.replace(signal, stop_loss=earnings_adj.adjusted_stop)
             reasons.append("earnings in window: stop widened 1 ATR")
         elif earnings_adj.action == "downgrade":
@@ -112,6 +109,4 @@ class EntryGate:
                     adjusted_signal=adjusted,
                 )
 
-        return EntryDecision(
-            allowed=True, reasons=tuple(reasons), adjusted_signal=adjusted
-        )
+        return EntryDecision(allowed=True, reasons=tuple(reasons), adjusted_signal=adjusted)

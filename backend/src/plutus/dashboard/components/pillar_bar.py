@@ -14,7 +14,9 @@ def pillar_bar(label: str, value: float, max_value: int, color_token: str) -> No
     pct = 0.0 if max_value == 0 else max(0.0, min(1.0, value / max_value))
     color = PILLAR_COLORS.get(color_token, TEXT_SECONDARY)
     width_pct = int(pct * 100)
-    display = f"{value:.2f}" if isinstance(value, float) and value != int(value) else f"{int(value)}"
+    display = (
+        f"{value:.2f}" if isinstance(value, float) and value != int(value) else f"{int(value)}"
+    )
     st.markdown(
         f"""<div style="display:grid; grid-template-columns: 110px 1fr 50px;
 gap: 8px 10px; font-size: 12px; align-items: center; margin: 4px 0;">

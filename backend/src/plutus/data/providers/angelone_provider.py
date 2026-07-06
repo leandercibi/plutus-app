@@ -4,6 +4,7 @@ import logging
 import threading
 import time
 from datetime import date, timedelta
+from typing import Any
 
 import pandas as pd
 import requests
@@ -13,7 +14,7 @@ logger = logging.getLogger(__name__)
 _INSTRUMENT_CACHE: dict[str, str] = {}
 _INSTRUMENT_LOCK = threading.Lock()
 
-_SESSION_CACHE: dict[str, object] = {}   # keys: "obj", "refresh_token"
+_SESSION_CACHE: dict[str, object] = {}  # keys: "obj", "refresh_token"
 _SESSION_LOCK = threading.Lock()
 
 _RATE_LOCK = threading.Lock()
@@ -61,14 +62,16 @@ def _resolve_token(symbol: str) -> str:
     return token
 
 
-def _get_session(api_key: str, client_id: str, password: str, totp_secret: str, force: bool = False):
+def _get_session(
+    api_key: str, client_id: str, password: str, totp_secret: str, force: bool = False
+) -> Any:
     with _SESSION_LOCK:
         if not force and _SESSION_CACHE.get("obj"):
             return _SESSION_CACHE["obj"]
 
         from SmartApi import SmartConnect
 
-        obj = _SESSION_CACHE.get("obj") or SmartConnect(api_key=api_key)
+        obj: Any = _SESSION_CACHE.get("obj") or SmartConnect(api_key=api_key)
 
         # Prefer token refresh (no TOTP) if we have a refresh_token
         refresh_token = _SESSION_CACHE.get("refresh_token")
@@ -80,10 +83,13 @@ def _get_session(api_key: str, client_id: str, password: str, totp_secret: str, 
                     logger.info("angel_session_token_refreshed for client %s", client_id)
                     return obj
             except Exception:
-                logger.warning("angel_token_refresh_failed — falling back to full TOTP login", exc_info=True)
+                logger.warning(
+                    "angel_token_refresh_failed — falling back to full TOTP login", exc_info=True
+                )
 
         # Full TOTP re-login
         import pyotp
+
         if not isinstance(obj, SmartConnect) or force:
             obj = SmartConnect(api_key=api_key)
         totp = pyotp.TOTP(totp_secret).now()
@@ -151,9 +157,13 @@ class AngelOneProvider:
         # float → fail fast (user-facing API handlers)
         self._rate_limit_timeout = rate_limit_timeout
 
-    def _session(self, force: bool = False):
+    def _session(self, force: bool = False) -> Any:
         return _get_session(
-            self._api_key, self._client_id, self._password, self._totp_secret, force=force,
+            self._api_key,
+            self._client_id,
+            self._password,
+            self._totp_secret,
+            force=force,
         )
 
     def fetch_ltp(self, symbol: str) -> float:
@@ -214,7 +224,9 @@ class AngelOneProvider:
     def fetch(self, symbol: str, start: date, end: date) -> pd.DataFrame:
         return self._getCandleData(symbol, "ONE_DAY", start, end)
 
-    def fetch_intraday(self, symbol: str, days: int = 60, interval: str = "ONE_HOUR") -> pd.DataFrame:
+    def fetch_intraday(
+        self, symbol: str, days: int = 60, interval: str = "ONE_HOUR"
+    ) -> pd.DataFrame:
         """Fetch intraday OHLCV. Angel One supports ONE_HOUR for up to ~400 days."""
         end = date.today()
         start = end - timedelta(days=days)

@@ -19,15 +19,11 @@ def fetch_pct_above_dma(
     return provider.fetch_pct_above_dma(window, start, end).clip(lower=0.0, upper=1.0)
 
 
-def fetch_advance_decline(
-    start: date, end: date, provider: BreadthProvider
-) -> pd.Series:
+def fetch_advance_decline(start: date, end: date, provider: BreadthProvider) -> pd.Series:
     """Daily advance/decline ratio. >1 means advancers dominate."""
     return provider.fetch_advance_decline(start, end)
 
 
-def latest_pct_above_dma(
-    window: int, start: date, end: date, provider: BreadthProvider
-) -> float:
+def latest_pct_above_dma(window: int, start: date, end: date, provider: BreadthProvider) -> float:
     series = fetch_pct_above_dma(window, start, end, provider)
     return float(series.iloc[-1])

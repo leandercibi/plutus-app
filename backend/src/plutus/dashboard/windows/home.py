@@ -5,7 +5,6 @@ import streamlit as st
 from plutus.dashboard.api_client import fetch_portfolio_snapshot, trigger_price_check
 from plutus.dashboard.components.cash_banner import cash_banner
 from plutus.dashboard.components.regime_banner import regime_banner
-from plutus.dashboard.components.tranche_pills import tranche_pills
 from plutus.dashboard.data import HomeView
 from plutus.dashboard.theme import (
     ACCUMULATION_ACCENT,
@@ -18,7 +17,6 @@ from plutus.dashboard.theme import (
     INFO_BLUE,
     INFO_BLUE_BG,
     LOSS_RED,
-    REGIME_BEAR,
     SURFACE,
     SWING_ACCENT,
     TEXT_PRIMARY,
@@ -107,14 +105,14 @@ def _render_pnl_section() -> None:
         f'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">'
         f'<span style="font-weight:500;color:{TEXT_PRIMARY};font-size:14px;">Live P/L</span>'
         f'<span style="font-size:10px;color:{TEXT_TERTIARY};">as of {checked} UTC</span>'
-        f'</div>'
+        f"</div>"
         f'<div style="display:flex;gap:24px;align-items:baseline;margin-bottom:10px;">'
         f'<span style="font-size:22px;font-weight:500;color:{pnl_color};">'
-        f'{arrow} ₹{abs(total_pnl):,.2f}</span>'
+        f"{arrow} ₹{abs(total_pnl):,.2f}</span>"
         f'<span style="font-size:14px;color:{pnl_color};">{total_pnl_pct:+.2f}%</span>'
         f'<span style="font-size:11px;color:{TEXT_TERTIARY};">'
-        f'Invested ₹{snapshot["total_invested"]:,.0f} · Current ₹{snapshot["total_current"]:,.0f}</span>'
-        f'</div>',
+        f"Invested ₹{snapshot['total_invested']:,.0f} · Current ₹{snapshot['total_current']:,.0f}</span>"
+        f"</div>",
         unsafe_allow_html=True,
     )
 
@@ -122,10 +120,10 @@ def _render_pnl_section() -> None:
     if positions:
         header = (
             f'<div style="display:grid;grid-template-columns:90px 70px 80px 80px 80px 70px 1fr;'
-            f'gap:8px;font-size:10px;color:{TEXT_TERTIARY};padding:4px 0;'
+            f"gap:8px;font-size:10px;color:{TEXT_TERTIARY};padding:4px 0;"
             f'border-bottom:0.5px solid {BORDER};text-transform:lowercase;letter-spacing:0.3px;">'
-            f'<span>symbol</span><span>mode</span><span>avg cost</span>'
-            f'<span>price</span><span>P/L</span><span>P/L %</span><span>SL dist</span></div>'
+            f"<span>symbol</span><span>mode</span><span>avg cost</span>"
+            f"<span>price</span><span>P/L</span><span>P/L %</span><span>SL dist</span></div>"
         )
         rows_html = header
         for p in sorted(positions, key=lambda x: x["pnl"], reverse=True):
@@ -133,7 +131,9 @@ def _render_pnl_section() -> None:
             sl_text = ""
             if p.get("sl_distance_pct") is not None:
                 sl_val = p["sl_distance_pct"]
-                sl_color = LOSS_RED if sl_val <= 3 else (SWING_ACCENT if sl_val <= 5 else TEXT_TERTIARY)
+                sl_color = (
+                    LOSS_RED if sl_val <= 3 else (SWING_ACCENT if sl_val <= 5 else TEXT_TERTIARY)
+                )
                 sl_text = f'<span style="color:{sl_color};">{sl_val:.1f}%</span>'
             mode_color = SWING_ACCENT if p["mode"] == "swing" else ACCUMULATION_ACCENT
             rows_html += (
@@ -145,8 +145,8 @@ def _render_pnl_section() -> None:
                 f'<span style="color:{TEXT_PRIMARY};">₹{p["current_price"]:,.0f}</span>'
                 f'<span style="color:{row_color};">₹{p["pnl"]:+,.0f}</span>'
                 f'<span style="color:{row_color};">{p["pnl_pct"]:+.1f}%</span>'
-                f'<span>{sl_text}</span>'
-                f'</div>'
+                f"<span>{sl_text}</span>"
+                f"</div>"
             )
         rows_html += "</div>"
         st.markdown(rows_html, unsafe_allow_html=True)
@@ -164,7 +164,7 @@ def render(data: HomeView) -> None:
     # Header
     pill_fg, pill_bg = _REGIME_PILL_STYLE.get(regime.label, (TEXT_SECONDARY, SURFACE))
     pct_above_ema = ""
-    for r in (regime.reasons or []):
+    for r in regime.reasons or []:
         if "above" in r.lower() or "below" in r.lower():
             pct_above_ema = r
             break
@@ -174,7 +174,7 @@ margin-bottom: 14px;">
   <h1 style="margin:0;">Portfolio overview</h1>
   <div style="display:flex; align-items: center; gap: 10px;">
     <span class="plutus-pill" style="background:{pill_bg}; color:{pill_fg};">
-      ● Nifty {regime.label} · {pct_above_ema or regime.confidence + ' confidence'}
+      ● Nifty {regime.label} · {pct_above_ema or regime.confidence + " confidence"}
     </span>
     <span style="font-size: 12px; color: {TEXT_SECONDARY};">{_inr(data.total_capital)}</span>
   </div>
@@ -228,7 +228,7 @@ margin-bottom: 14px;">
   <span style="font-weight: 500; color:{TEXT_PRIMARY};">⚡ Swing mode</span>
   {_status_pill(data.swing_mode, data.swing_mode)}
 </div>
-{swing_rows_html or '<div style="color:'+TEXT_TERTIARY+'; font-size: 12px;">No signals this run.</div>'}
+{swing_rows_html or '<div style="color:' + TEXT_TERTIARY + '; font-size: 12px;">No signals this run.</div>'}
 <div style="margin-top: 8px; padding-top: 8px; border-top: 0.5px solid {BORDER};
 font-size: 11px; color: {TEXT_SECONDARY};">View all signals →</div>
 </div>""",
@@ -243,7 +243,7 @@ font-size: 11px; color: {TEXT_SECONDARY};">View all signals →</div>
   <span style="font-weight: 500; color:{TEXT_PRIMARY};">📈 Accumulation mode</span>
   {_status_pill(data.accumulation_mode, data.accumulation_mode)}
 </div>
-{acc_rows_html or '<div style="color:'+TEXT_TERTIARY+'; font-size: 12px;">No candidates this run.</div>'}
+{acc_rows_html or '<div style="color:' + TEXT_TERTIARY + '; font-size: 12px;">No candidates this run.</div>'}
 <div style="margin-top: 8px; padding-top: 8px; border-top: 0.5px solid {BORDER};
 font-size: 11px; color: {TEXT_SECONDARY};">View all candidates →</div>
 </div>""",

@@ -50,9 +50,7 @@ class PerRegimeStatStore:
             existing.ci_low = stats.ci_low_R
             existing.ci_high = stats.ci_high_R
 
-    def latest(
-        self, bundle: str, regime: str, session: Session
-    ) -> BundleStatPerRegime | None:
+    def latest(self, bundle: str, regime: str, session: Session) -> BundleStatPerRegime | None:
         return session.execute(
             select(BundleStatPerRegime)
             .where(

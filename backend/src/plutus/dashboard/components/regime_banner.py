@@ -4,7 +4,6 @@ import streamlit as st
 
 from plutus.dashboard.theme import (
     BUY_GREEN,
-    LOSS_RED,
     LOSS_RED_BG,
     REGIME_BEAR,
     SWING_ACCENT,
@@ -24,9 +23,7 @@ _LABEL_COLOR = {
 def regime_banner(verdict: RegimeVerdict, cash_decision: CashDecision | None) -> None:
     color = _LABEL_COLOR.get(verdict.label, TEXT_SECONDARY)
     reasons = " · ".join(verdict.reasons[:3]) if verdict.reasons else "no detail"
-    body = (
-        f"Regime <b>{verdict.label}</b> · {verdict.confidence} confidence. {reasons}."
-    )
+    body = f"Regime <b>{verdict.label}</b> · {verdict.confidence} confidence. {reasons}."
     if cash_decision is not None and cash_decision.reason:
         body += f" {cash_decision.reason}"
     st.markdown(

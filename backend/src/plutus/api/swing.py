@@ -84,7 +84,9 @@ def list_signals(
     run_id: str | None = Query(default=None),
     label: str | None = Query(default=None),
     latest_run: bool = Query(default=False, description="Filter to the most recent run_id only"),
-    dedup: bool = Query(default=False, description="Keep highest-scored signal per (symbol, bundle) pair"),
+    dedup: bool = Query(
+        default=False, description="Keep highest-scored signal per (symbol, bundle) pair"
+    ),
     db: Session = Depends(get_db),
 ) -> list[SwingSignalOut]:
     stmt = select(SwingSignal)
@@ -92,9 +94,7 @@ def list_signals(
     # If latest_run=true and no explicit run_id, resolve the most recent run_id
     if latest_run and run_id is None:
         latest = db.execute(
-            select(SwingSignal.run_id)
-            .order_by(SwingSignal.created_at.desc())
-            .limit(1)
+            select(SwingSignal.run_id).order_by(SwingSignal.created_at.desc()).limit(1)
         ).scalar_one_or_none()
         if latest is not None:
             run_id = latest
@@ -133,15 +133,19 @@ def get_signal(signal_id: int, db: Session = Depends(get_db)) -> SwingSignalOut:
 @router.get("/positions", response_model=list[SwingTradeOut])
 def list_positions(db: Session = Depends(get_db)) -> list[SwingTradeOut]:
     cutoff = datetime.utcnow() - timedelta(days=7)
-    stmt = select(SwingTrade).where(
-        (SwingTrade.state == "OPEN")
-        | (SwingTrade.state == "T1_HIT")
-        | (
-            SwingTrade.state.in_(_CLOSED_STATES)
-            & (SwingTrade.closed_at.is_not(None))
-            & (SwingTrade.closed_at >= cutoff)
+    stmt = (
+        select(SwingTrade)
+        .where(
+            (SwingTrade.state == "OPEN")
+            | (SwingTrade.state == "T1_HIT")
+            | (
+                SwingTrade.state.in_(_CLOSED_STATES)
+                & (SwingTrade.closed_at.is_not(None))
+                & (SwingTrade.closed_at >= cutoff)
+            )
         )
-    ).order_by(SwingTrade.opened_at.desc(), SwingTrade.id.desc())
+        .order_by(SwingTrade.opened_at.desc(), SwingTrade.id.desc())
+    )
     return [
         SwingTradeOut.model_validate(r, from_attributes=True)
         for r in db.execute(stmt).scalars().all()
@@ -149,9 +153,7 @@ def list_positions(db: Session = Depends(get_db)) -> list[SwingTradeOut]:
 
 
 @router.post("/trades/{trade_id}/fills/real", response_model=FillOut)
-def post_real_fill(
-    trade_id: int, body: RealFillIn, db: Session = Depends(get_db)
-) -> FillOut:
+def post_real_fill(trade_id: int, body: RealFillIn, db: Session = Depends(get_db)) -> FillOut:
     trade = db.get(SwingTrade, trade_id)
     if trade is None:
         raise HTTPException(status_code=404, detail="trade not found")
@@ -160,7 +162,7 @@ def post_real_fill(
         side=body.side,
         qty=body.qty,
         price=body.price,
-        filled_at=body.filled_at,
+        filled_at=body.filled_at or datetime.utcnow(),
         cost_inr=body.cost_inr,
         session=db,
     )
@@ -212,9 +214,7 @@ def enter_from_signal(
 
 
 @router.post("/trades/{trade_id}/exit/manual", response_model=SwingTradeOut)
-def manual_exit(
-    trade_id: int, body: ManualExitIn, db: Session = Depends(get_db)
-) -> SwingTradeOut:
+def manual_exit(trade_id: int, body: ManualExitIn, db: Session = Depends(get_db)) -> SwingTradeOut:
     trade = db.get(SwingTrade, trade_id)
     if trade is None:
         raise HTTPException(status_code=404, detail="trade not found")
@@ -230,9 +230,11 @@ def manual_exit(
 
 @router.get("/postmortem/latest", response_model=PostmortemOut)
 def latest_postmortem(db: Session = Depends(get_db)) -> PostmortemOut:
-    row = db.execute(
-        select(WeeklyPostmortem).order_by(WeeklyPostmortem.week_ending.desc()).limit(1)
-    ).scalars().first()
+    row = (
+        db.execute(select(WeeklyPostmortem).order_by(WeeklyPostmortem.week_ending.desc()).limit(1))
+        .scalars()
+        .first()
+    )
     if row is None:
         raise HTTPException(status_code=404, detail="no postmortem")
     return PostmortemOut(
@@ -249,9 +251,13 @@ def latest_postmortem(db: Session = Depends(get_db)) -> PostmortemOut:
 
 @router.get("/cooldowns/{symbol}", response_model=list[CooldownRowOut])
 def get_cooldowns(symbol: str, db: Session = Depends(get_db)) -> list[CooldownRowOut]:
-    rows = db.execute(
-        select(AlertCooldown)
-        .where(AlertCooldown.symbol == symbol)
-        .order_by(AlertCooldown.kind, AlertCooldown.last_fired_at.desc())
-    ).scalars().all()
+    rows = (
+        db.execute(
+            select(AlertCooldown)
+            .where(AlertCooldown.symbol == symbol)
+            .order_by(AlertCooldown.kind, AlertCooldown.last_fired_at.desc())
+        )
+        .scalars()
+        .all()
+    )
     return [CooldownRowOut.model_validate(r, from_attributes=True) for r in rows]

@@ -277,3 +277,20 @@ secrets.json
 
 
 !.crew/graphs/.gitkeep
+
+.claude
+.grimp_cache
+.crew
+
+# ── macOS Finder junk ─────────────────────────────────────────────────────────
+.DS_Store
+**/.DS_Store
+
+# ── Plutus: import-linter cache ───────────────────────────────────────────────
+.import_linter_cache/
+**/.import_linter_cache/
+
+# ── Plutus: local review/audit artifacts (kept under specs/, which is ignored) ─
+#   One-off HTML backtests/audits and ad-hoc review notes live in specs/reviews/.
+#   specs/ is already ignored above; this documents where such scratch docs go.
+specs/reviews/

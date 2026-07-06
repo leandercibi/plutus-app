@@ -26,9 +26,7 @@ class CircuitGate:
     overrides this only for >2 ATR moves).
     """
 
-    def __init__(
-        self, settings: Settings, circuit_pct: float = _DEFAULT_CIRCUIT_PCT
-    ) -> None:
+    def __init__(self, settings: Settings, circuit_pct: float = _DEFAULT_CIRCUIT_PCT) -> None:
         self._settings = settings
         self._circuit_pct = circuit_pct
 
@@ -45,9 +43,7 @@ class CircuitGate:
         for i in range(1, len(window)):
             locked = highs[i] == lows[i]
             prior_close = closes[i - 1]
-            move = (
-                abs(closes[i] - prior_close) / prior_close if prior_close > 0 else 0.0
-            )
+            move = abs(closes[i] - prior_close) / prior_close if prior_close > 0 else 0.0
             if locked or move >= self._circuit_pct:
                 hit_dates.append(dates[i])
 

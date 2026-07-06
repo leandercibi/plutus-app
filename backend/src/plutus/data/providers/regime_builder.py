@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from datetime import date, timedelta
 from decimal import Decimal
+from typing import cast
 
 import pandas as pd
 import yfinance as yf
@@ -20,13 +21,14 @@ _LOOKBACK = 210  # need 200d DMA + buffer
 def _nifty_series(as_of: date) -> pd.Series:
     start = as_of - timedelta(days=_LOOKBACK)
     try:
-        raw = yf.download(_NIFTY, start=start, end=as_of + timedelta(days=1),
-                          auto_adjust=True, progress=False)
+        raw = yf.download(
+            _NIFTY, start=start, end=as_of + timedelta(days=1), auto_adjust=True, progress=False
+        )
         if raw.empty:
             raise ValueError("empty")
         s = raw["Close"].squeeze()
         s.index = pd.to_datetime(s.index).normalize()
-        return s.sort_index()
+        return cast(pd.Series, s.sort_index())
     except Exception as exc:
         logger.warning("NIFTY download failed: %s", exc)
         return pd.Series(dtype=float)
@@ -66,12 +68,16 @@ def build_regime_inputs(
 
     fii_df = fii_dii_provider.fetch(as_of - timedelta(days=10), as_of)  # type: ignore[attr-defined]
     _CRORE = 10_000_000
-    fii_5d = Decimal(str(float(
-        fii_df["fii_net_inr_crore"].tail(5).sum() * _CRORE
-    ))) if not fii_df.empty else Decimal("0")
-    dii_5d = Decimal(str(float(
-        fii_df["dii_net_inr_crore"].tail(5).sum() * _CRORE
-    ))) if not fii_df.empty else Decimal("0")
+    fii_5d = (
+        Decimal(str(float(fii_df["fii_net_inr_crore"].tail(5).sum() * _CRORE)))
+        if not fii_df.empty
+        else Decimal("0")
+    )
+    dii_5d = (
+        Decimal(str(float(fii_df["dii_net_inr_crore"].tail(5).sum() * _CRORE)))
+        if not fii_df.empty
+        else Decimal("0")
+    )
 
     return RegimeInputs(
         nifty_close=nifty_close,
@@ -90,8 +96,14 @@ def build_regime_inputs(
 def _neutral(as_of: date) -> RegimeInputs:
     v = Decimal("20000")
     return RegimeInputs(
-        nifty_close=v, nifty_50dma=v, nifty_200dma=v,
-        pct_above_50dma=0.5, pct_above_200dma=0.5, advance_decline=1.0,
-        india_vix=15.0, fii_flow_5d_sum_inr=Decimal("0"),
-        dii_flow_5d_sum_inr=Decimal("0"), pct_above_50dma_5d_ago=0.5,
+        nifty_close=v,
+        nifty_50dma=v,
+        nifty_200dma=v,
+        pct_above_50dma=0.5,
+        pct_above_200dma=0.5,
+        advance_decline=1.0,
+        india_vix=15.0,
+        fii_flow_5d_sum_inr=Decimal("0"),
+        dii_flow_5d_sum_inr=Decimal("0"),
+        pct_above_50dma_5d_ago=0.5,
     )

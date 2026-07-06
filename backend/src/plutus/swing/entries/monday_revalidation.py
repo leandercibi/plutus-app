@@ -32,9 +32,7 @@ class MondayRevalidation:
         hard_kill_fires: bool,
     ) -> RevalidationOutcome:
         if hard_kill_fires:
-            return RevalidationOutcome(
-                keep=False, reason="weekend sentiment hard-kill fired"
-            )
+            return RevalidationOutcome(keep=False, reason="weekend sentiment hard-kill fired")
 
         gap = abs(monday_open - sunday_signal.entry)
         gap_limit = Decimal(str(self._settings.monday_gap_kill_atr_mult)) * atr

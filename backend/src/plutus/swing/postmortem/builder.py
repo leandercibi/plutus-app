@@ -39,9 +39,7 @@ def build_postmortem_md(inputs: PostmortemInputs) -> str:
     lines.append(f"- Nifty buy & hold: {b.nifty_net_pct:.2f}%")
     lines.append(f"- Regime-switched: {b.regime_switched_net_pct:.2f}%")
     lines.append(f"- Random liquid baseline: {b.random_liquid_net_pct:.2f}%")
-    lines.append(
-        f"- Profit factor: {b.plutus_profit_factor:.2f}  (n={b.plutus_n_trades})"
-    )
+    lines.append(f"- Profit factor: {b.plutus_profit_factor:.2f}  (n={b.plutus_n_trades})")
     lines.append("")
     lines.append("## Expectancy")
     lines.append(f"- Realized expectancy: {inputs.realized_expectancy_R:.2f}R")

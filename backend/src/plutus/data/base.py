@@ -1,19 +1,17 @@
 from __future__ import annotations
 
 from datetime import date
-from typing import Literal, Protocol, runtime_checkable
+from typing import ClassVar, Literal, Protocol, runtime_checkable
 
 import pandas as pd
 
-AdjustmentPolicy = Literal[
-    "adjusted_close_only", "split_adjusted", "split_and_dividend"
-]
+AdjustmentPolicy = Literal["adjusted_close_only", "split_adjusted", "split_and_dividend"]
 
 
 @runtime_checkable
 class OHLCVProvider(Protocol):
-    name: str
-    adjustment: AdjustmentPolicy
+    name: ClassVar[str]
+    adjustment: ClassVar[AdjustmentPolicy]
 
     def fetch(self, symbol: str, start: date, end: date) -> pd.DataFrame:
         """Return columns: open, high, low, close, volume; indexed by date."""

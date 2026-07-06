@@ -45,6 +45,4 @@ def reset_engine_for_tests(url: str) -> None:
     """Test-only: rebind the engine to an isolated DB URL."""
     global _engine, _SessionLocal
     _engine = create_engine(url, future=True)
-    _SessionLocal = sessionmaker(
-        autocommit=False, autoflush=False, bind=_engine, future=True
-    )
+    _SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=_engine, future=True)

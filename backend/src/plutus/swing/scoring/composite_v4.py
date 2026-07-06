@@ -15,9 +15,9 @@ from typing import Any
 
 import pandas as pd
 
-from plutus.shared.rs.blend import RSBlend, RSBlendResult
 from plutus.config.settings import Settings
 from plutus.shared.regime.detector import RegimeInputs
+from plutus.shared.rs.blend import RSBlend, RSBlendResult
 from plutus.shared.smart_money.delivery import DeliveryTrend
 from plutus.swing.scoring.flow_pillar import FlowPillar, flow_pillar
 from plutus.swing.scoring.regime_pillar import RegimePillar, regime_pillar_continuous

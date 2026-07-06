@@ -4,6 +4,7 @@
 Run this periodically (e.g. once a month) to keep the universe up to date:
     python scripts/refresh_nse_universe.py
 """
+
 from __future__ import annotations
 
 import csv
@@ -31,11 +32,7 @@ def fetch_nifty500() -> list[str]:
     with urllib.request.urlopen(req, timeout=15, context=ctx) as resp:
         data = resp.read().decode("utf-8")
     reader = csv.DictReader(io.StringIO(data))
-    return sorted(
-        row["Symbol"].strip()
-        for row in reader
-        if row.get("Symbol", "").strip()
-    )
+    return sorted(row["Symbol"].strip() for row in reader if row.get("Symbol", "").strip())
 
 
 def write_csv(symbols: list[str]) -> None:
@@ -47,7 +44,7 @@ def write_csv(symbols: list[str]) -> None:
 
 
 def main() -> None:
-    print(f"Fetching Nifty 500 list from NSE India…")
+    print("Fetching Nifty 500 list from NSE India…")
     try:
         symbols = fetch_nifty500()
     except Exception as exc:

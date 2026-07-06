@@ -84,9 +84,7 @@ def compute_expectancy(
     sample_sufficient = n >= settings.calibration_min_n_low
 
     passes_primary = sample_sufficient and expectancy_r >= settings.expectancy_floor_R
-    passes_fallback = (
-        not sample_sufficient
-    ) and drawn_rr >= settings.drawn_rr_fallback_floor
+    passes_fallback = (not sample_sufficient) and drawn_rr >= settings.drawn_rr_fallback_floor
 
     return ExpectancyResult(
         expectancy_R=expectancy_r,

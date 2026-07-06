@@ -96,9 +96,7 @@ class BacktestRunner:
                     target_1=signal.target_1,
                     target_2=signal.target_2,
                 )
-                fill = self._fills.fill_entry(
-                    plan, next_bar, adv_for(symbol), atr_pct_for(symbol)
-                )
+                fill = self._fills.fill_entry(plan, next_bar, adv_for(symbol), atr_pct_for(symbol))
                 trade = self._simulate(
                     signal,
                     plan,
@@ -114,9 +112,7 @@ class BacktestRunner:
                     trades.append(trade)
             day += timedelta(days=1)
 
-        return BacktestResult(
-            trades=trades, config=cfg, fills_before_signal=lookahead_violations
-        )
+        return BacktestResult(trades=trades, config=cfg, fills_before_signal=lookahead_violations)
 
     def _next_bar(self, candles: pd.DataFrame, day: date) -> OHLCBar | None:
         future = candles[candles["date"] > pd.Timestamp(day)]

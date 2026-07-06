@@ -56,7 +56,5 @@ class FundamentalsScorer:
             blended_rs=rs_blend.blended,
         )
         hard_avoid = self._hard_avoid.evaluate(snapshot)
-        label = self._classifier.classify(
-            pillars.total, pillars.quality, hard_avoid
-        )
+        label = self._classifier.classify(pillars.total, pillars.quality, hard_avoid)
         return FundamentalsScore(pillars=pillars, label=label, hard_avoid=hard_avoid)

@@ -35,10 +35,7 @@ class ReversalBundle(BaseBundle):
     def fit_signal(
         self, symbol: str, candles: pd.DataFrame, ctx: BundleContext
     ) -> BundleSignal | None:
-        if (
-            ctx.delivery is None
-            or len(candles) < _DMA_WINDOW + _DOWN_CLOSES_REQUIRED + 1
-        ):
+        if ctx.delivery is None or len(candles) < _DMA_WINDOW + _DOWN_CLOSES_REQUIRED + 1:
             return None
 
         close = candles["close"]

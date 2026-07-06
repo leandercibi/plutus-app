@@ -26,9 +26,7 @@ def _headers() -> dict[str, str]:
 
 
 def _post(path: str, json: dict | None = None, timeout: int = 10) -> requests.Response:
-    return requests.post(
-        f"{_base()}{path}", headers=_headers(), json=json, timeout=timeout
-    )
+    return requests.post(f"{_base()}{path}", headers=_headers(), json=json, timeout=timeout)
 
 
 def _get(path: str, timeout: int = 10) -> requests.Response:
@@ -160,9 +158,7 @@ def fetch_ltp(symbol: str) -> float | None:
         return None
 
 
-def start_accum_position(
-    symbol: str, price: Decimal | float, qty: int
-) -> tuple[bool, str]:
+def start_accum_position(symbol: str, price: Decimal | float, qty: int) -> tuple[bool, str]:
     payload = {"symbol": symbol, "price": str(price), "qty": qty}
     try:
         r = _post("/accumulation/positions", json=payload)
@@ -173,9 +169,7 @@ def start_accum_position(
         return False, f"network error: {e}"
 
 
-def log_tranche_fill(
-    position_id: int, price: Decimal | float, qty: int
-) -> tuple[bool, str]:
+def log_tranche_fill(position_id: int, price: Decimal | float, qty: int) -> tuple[bool, str]:
     payload = {"price": str(price), "qty": qty}
     try:
         r = _post(f"/accumulation/positions/{position_id}/tranches", json=payload)
@@ -219,9 +213,7 @@ def resume_position(position_id: int) -> tuple[bool, str]:
         return False, f"network error: {e}"
 
 
-def fetch_chart_data(
-    symbol: str, signal_id: int | None = None, days: int = 300
-) -> dict | None:
+def fetch_chart_data(symbol: str, signal_id: int | None = None, days: int = 300) -> dict | None:
     params: dict[str, str] = {"days": str(days)}
     if signal_id is not None:
         params["signal_id"] = str(signal_id)

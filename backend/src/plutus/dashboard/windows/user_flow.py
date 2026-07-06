@@ -5,7 +5,6 @@ import streamlit as st
 from plutus.dashboard.api_client import trigger_monday_reval, trigger_sunday_run
 from plutus.dashboard.data import UserFlowView
 from plutus.dashboard.theme import (
-    BORDER,
     BUY_GREEN,
     LOSS_RED,
     SURFACE,
@@ -77,7 +76,7 @@ padding: 6px 12px; background: {SURFACE}; border-radius: 4px; margin-bottom: 4px
 font-size: 12px; gap: 10px;">
 <span><b>{row.job_name}</b></span>
 <span style="color:{TEXT_TERTIARY}">{row.started_at}</span>
-<span style="color:{TEXT_TERTIARY}">{row.ended_at or '—'}</span>
+<span style="color:{TEXT_TERTIARY}">{row.ended_at or "—"}</span>
 <span style="color:{color}; text-align: right;">{status}</span>
 </div>""",
             unsafe_allow_html=True,

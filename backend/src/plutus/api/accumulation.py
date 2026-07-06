@@ -39,9 +39,7 @@ def list_candidates(
     stmt = select(AccumulationCandidate)
     if run_id is not None:
         stmt = stmt.where(AccumulationCandidate.run_id == run_id)
-    stmt = stmt.order_by(
-        AccumulationCandidate.created_at.desc(), AccumulationCandidate.id.desc()
-    )
+    stmt = stmt.order_by(AccumulationCandidate.created_at.desc(), AccumulationCandidate.id.desc())
     return [
         AccumulationCandidateOut.model_validate(r, from_attributes=True)
         for r in db.execute(stmt).scalars().all()
@@ -50,23 +48,21 @@ def list_candidates(
 
 @router.get("/positions", response_model=list[AccumulationPositionOut])
 def list_positions(db: Session = Depends(get_db)) -> list[AccumulationPositionOut]:
-    rows = db.execute(
-        select(AccumulationPosition).order_by(AccumulationPosition.opened_at.desc())
-    ).scalars().all()
-    return [
-        AccumulationPositionOut.model_validate(r, from_attributes=True) for r in rows
-    ]
+    rows = (
+        db.execute(select(AccumulationPosition).order_by(AccumulationPosition.opened_at.desc()))
+        .scalars()
+        .all()
+    )
+    return [AccumulationPositionOut.model_validate(r, from_attributes=True) for r in rows]
 
 
 @router.get("/positions/{position_id}/tranches", response_model=list[TrancheOut])
-def list_tranches(
-    position_id: int, db: Session = Depends(get_db)
-) -> list[TrancheOut]:
-    rows = db.execute(
-        select(Tranche)
-        .where(Tranche.position_id == position_id)
-        .order_by(Tranche.seq)
-    ).scalars().all()
+def list_tranches(position_id: int, db: Session = Depends(get_db)) -> list[TrancheOut]:
+    rows = (
+        db.execute(select(Tranche).where(Tranche.position_id == position_id).order_by(Tranche.seq))
+        .scalars()
+        .all()
+    )
     return [TrancheOut.model_validate(r, from_attributes=True) for r in rows]
 
 
@@ -80,7 +76,9 @@ def start_position(body: StartPositionIn, db: Session = Depends(get_db)) -> Accu
         )
     ).scalar_one_or_none()
     if existing is not None:
-        raise HTTPException(status_code=409, detail="active position already exists for this symbol")
+        raise HTTPException(
+            status_code=409, detail="active position already exists for this symbol"
+        )
 
     now = datetime.utcnow()
     pos = AccumulationPosition(
@@ -119,11 +117,15 @@ def log_tranche_fill(
     if pos.state in ("EXITED", "CONVERTED_TO_SWING"):
         raise HTTPException(status_code=409, detail="position is closed")
 
-    existing_tranches = db.execute(
-        select(Tranche)
-        .where(Tranche.position_id == position_id, Tranche.filled_at.isnot(None))
-        .order_by(Tranche.seq)
-    ).scalars().all()
+    existing_tranches = (
+        db.execute(
+            select(Tranche)
+            .where(Tranche.position_id == position_id, Tranche.filled_at.isnot(None))
+            .order_by(Tranche.seq)
+        )
+        .scalars()
+        .all()
+    )
     next_seq = len(existing_tranches) + 1
     if next_seq > 5:
         raise HTTPException(status_code=409, detail="all 5 tranches already filled")
@@ -181,9 +183,7 @@ def pause_position(
 
 
 @router.post("/positions/{position_id}/resume", response_model=AccumulationPositionOut)
-def resume_position(
-    position_id: int, db: Session = Depends(get_db)
-) -> AccumulationPositionOut:
+def resume_position(position_id: int, db: Session = Depends(get_db)) -> AccumulationPositionOut:
     pos = db.get(AccumulationPosition, position_id)
     if pos is None:
         raise HTTPException(status_code=404, detail="position not found")
@@ -194,12 +194,8 @@ def resume_position(
     return AccumulationPositionOut.model_validate(pos, from_attributes=True)
 
 
-@router.post(
-    "/positions/{position_id}/convert-to-swing", response_model=SwingTradeOut
-)
-def convert_to_swing(
-    position_id: int, db: Session = Depends(get_db)
-) -> SwingTradeOut:
+@router.post("/positions/{position_id}/convert-to-swing", response_model=SwingTradeOut)
+def convert_to_swing(position_id: int, db: Session = Depends(get_db)) -> SwingTradeOut:
     pos = db.get(AccumulationPosition, position_id)
     if pos is None:
         raise HTTPException(status_code=404, detail="position not found")

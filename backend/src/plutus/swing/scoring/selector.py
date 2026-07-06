@@ -33,9 +33,7 @@ class BundleSelector:
     def __init__(self, inputs: SelectorInputs) -> None:
         self._inputs = inputs
 
-    def rank_bundles(
-        self, regime: str, candidates: list[BundleSignal]
-    ) -> list[BundleSignal]:
+    def rank_bundles(self, regime: str, candidates: list[BundleSignal]) -> list[BundleSignal]:
         eligible: list[tuple[float, BundleSignal]] = []
         for sig in candidates:
             stat = self._inputs.pooled_oos_stats.get((sig.bundle, regime))
@@ -57,15 +55,11 @@ class BundleSelector:
     def _default_seed(
         self, regime: str, eligible: list[tuple[float, BundleSignal]]
     ) -> BundleSignal | None:
-        composite = next(
-            (sig for _, sig in eligible if sig.bundle == "composite"), None
-        )
+        composite = next((sig for _, sig in eligible if sig.bundle == "composite"), None)
         if composite is not None:
             sharpes = [sharpe for sharpe, _ in eligible]
             top_quartile_floor = float(np.percentile(sharpes, 75, method="lower"))
-            composite_sharpe = next(
-                sharpe for sharpe, sig in eligible if sig.bundle == "composite"
-            )
+            composite_sharpe = next(sharpe for sharpe, sig in eligible if sig.bundle == "composite")
             if composite_sharpe >= top_quartile_floor:
                 return composite
 

@@ -20,9 +20,7 @@ class RunLog:
         self.session.flush()
         return run_id
 
-    def end(
-        self, run_id: str, status: RunStatus, details: dict[str, Any], now: datetime
-    ) -> None:
+    def end(self, run_id: str, status: RunStatus, details: dict[str, Any], now: datetime) -> None:
         row = self.session.get(RunLogRow, run_id)
         if row is None:
             raise ValueError(f"unknown run_id {run_id}")

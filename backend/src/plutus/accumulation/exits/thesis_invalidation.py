@@ -35,7 +35,5 @@ class ThesisInvalidationExit:
         result = self._hard_avoid.evaluate(latest_fundamentals)
         if result.avoid:
             position.state = _EXITED_STATE
-            return ExitDecision(
-                exit=True, reasons=result.reasons, new_state=_EXITED_STATE
-            )
+            return ExitDecision(exit=True, reasons=result.reasons, new_state=_EXITED_STATE)
         return ExitDecision(exit=False, reasons=[], new_state=None)

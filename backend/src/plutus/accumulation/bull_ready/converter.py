@@ -35,13 +35,9 @@ class BullReadyConverter:
         if regime.label != "BULL":
             return ConversionOutcome(offer=False, reason="regime is not BULL")
         if not regime.breadth_confirmed:
-            return ConversionOutcome(
-                offer=False, reason="BULL regime not breadth-confirmed"
-            )
+            return ConversionOutcome(offer=False, reason="BULL regime not breadth-confirmed")
         if not technicals:
-            return ConversionOutcome(
-                offer=False, reason="no swing setup on the symbol"
-            )
+            return ConversionOutcome(offer=False, reason="no swing setup on the symbol")
         return ConversionOutcome(
             offer=True,
             reason=f"bull-ready: confirmed BULL regime + swing setup on {position.symbol}",

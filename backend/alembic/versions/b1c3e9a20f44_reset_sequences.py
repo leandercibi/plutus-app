@@ -7,6 +7,7 @@ Create Date: 2026-06-29 12:00:00.000000
 Idempotent sequence repair: rows seeded with explicit IDs left sequences
 behind, causing UniqueViolation on the next insert.
 """
+
 from alembic import op
 
 revision = "b1c3e9a20f44"

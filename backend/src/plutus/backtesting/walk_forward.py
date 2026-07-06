@@ -4,6 +4,7 @@ import statistics
 from collections.abc import Generator, Iterator
 from dataclasses import dataclass
 from datetime import date, timedelta
+from typing import Any
 
 import pandas as pd
 
@@ -101,7 +102,9 @@ def walk_forward(
     when OOS Sharpe drops > 50 % vs IS in ≥ 50 % of windows.
     """
     if bundle not in _SUPPORTED_BUNDLES:
-        raise ValueError(f"bundle '{bundle}' not supported; choose from {sorted(_SUPPORTED_BUNDLES)}")
+        raise ValueError(
+            f"bundle '{bundle}' not supported; choose from {sorted(_SUPPORTED_BUNDLES)}"
+        )
 
     from plutus.backtesting.runner import BacktestConfig, BacktestRunner
     from plutus.config.settings import get_settings
@@ -138,7 +141,7 @@ def walk_forward(
     bundle_obj = getattr(mod, klass_name)(settings)
     delivery_full = DeliveryStubProvider().annotate_delivery(symbol, candles)
 
-    def _fit(sym: str, frame: pd.DataFrame, _d: date):
+    def _fit(sym: str, frame: pd.DataFrame, _d: date) -> Any:
         delivery_slice = delivery_full.iloc[: len(frame)]
         ctx = BundleContext(symbol=sym, regime="SIDEWAYS", delivery=delivery_slice)
         return bundle_obj.fit_signal(sym, frame, ctx)
@@ -194,9 +197,7 @@ def walk_forward(
     is_med = statistics.median(w.is_sharpe for w in results)
     oos_med = statistics.median(w.oos_sharpe for w in results)
     n_overfit = sum(
-        1
-        for w in results
-        if w.is_sharpe > 0 and (w.is_sharpe - w.oos_sharpe) / w.is_sharpe > 0.5
+        1 for w in results if w.is_sharpe > 0 and (w.is_sharpe - w.oos_sharpe) / w.is_sharpe > 0.5
     )
     overfit_flag = n_overfit / len(results) >= 0.5
 
@@ -225,9 +226,13 @@ try:
         type=click.Choice(sorted(_SUPPORTED_BUNDLES)),
         help="Bundle name",
     )
-    @click.option("--window", "window_days", default=30, show_default=True, help="Window size (bars)")
+    @click.option(
+        "--window", "window_days", default=30, show_default=True, help="Window size (bars)"
+    )
     @click.option("--step", "step_days", default=7, show_default=True, help="Step size (bars)")
-    @click.option("--lookback", "lookback_days", default=730, show_default=True, help="Lookback days")
+    @click.option(
+        "--lookback", "lookback_days", default=730, show_default=True, help="Lookback days"
+    )
     def cli(symbol: str, bundle: str, window_days: int, step_days: int, lookback_days: int) -> None:
         """Run IS/OOS walk-forward for a single symbol + bundle."""
         report = walk_forward(symbol, bundle, window_days, step_days, lookback_days)

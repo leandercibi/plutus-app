@@ -1,5 +1,10 @@
 # Plutus v3 — Agent Handoff Document
 
+> **Before writing code, read [`CODING_STANDARDS.md`](CODING_STANDARDS.md).** It is the
+> enforceable coding standard for this repo (layering, gates, git workflow). `main` is
+> protected — all work goes through a branch + PR; merging to `main` auto-deploys via
+> GitHub Actions (`.github/workflows/deploy.yml`).
+
 > Last updated: 2026-06-25  
 > Branch: `v3-UI-upgrade`  
 > Live URL: https://collecting-ride-hang-below.trycloudflare.com *(temporary — changes on container restart)*  

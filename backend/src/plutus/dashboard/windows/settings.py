@@ -18,14 +18,19 @@ def render(data: SettingsView) -> None:
         else:
             st.markdown(f"{fld.name}: `{fld.value}`")
 
-    st.caption("Editable fields are shown above. Changes must be applied via plutus.env — dashboard save is not yet wired to the config backend.")
+    st.caption(
+        "Editable fields are shown above. Changes must be applied via plutus.env — dashboard save is not yet wired to the config backend."
+    )
     reason = st.text_input("Reason for change (for audit log)", value="", key="settings_reason")
     if st.button("Save", key="settings_save", disabled=not reason.strip()):
-        st.info("Settings saved to session only — restart the app with an updated plutus.env to persist changes.")
+        st.info(
+            "Settings saved to session only — restart the app with an updated plutus.env to persist changes."
+        )
 
     st.divider()
     if st.button("Test Telegram", key="test_telegram"):
         from plutus.dashboard.api_client import test_telegram
+
         result = test_telegram()
         if result == "ok":
             st.success("Telegram test message sent!")
