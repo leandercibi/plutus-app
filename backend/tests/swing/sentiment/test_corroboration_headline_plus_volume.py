@@ -51,11 +51,7 @@ def evaluator() -> HardKillEvaluator:
 
 
 def test_headline_plus_gap_down_volume_fires(evaluator: HardKillEvaluator) -> None:
-    headlines = [
-        _hl(
-            "INFY warns of weak guidance", source="economictimes.com", entities=["INFY"]
-        )
-    ]
+    headlines = [_hl("INFY warns of weak guidance", source="economictimes.com", entities=["INFY"])]
     verdict = evaluator.evaluate(headlines, _gap_down_high_volume(), "INFY")
     assert verdict.fires is True
     assert verdict.reason == "headline_plus_pricevol"
@@ -64,11 +60,7 @@ def test_headline_plus_gap_down_volume_fires(evaluator: HardKillEvaluator) -> No
 def test_headline_without_pricevol_does_not_fire_via_pricevol(
     evaluator: HardKillEvaluator,
 ) -> None:
-    headlines = [
-        _hl(
-            "INFY warns of weak guidance", source="economictimes.com", entities=["INFY"]
-        )
-    ]
+    headlines = [_hl("INFY warns of weak guidance", source="economictimes.com", entities=["INFY"])]
     verdict = evaluator.evaluate(headlines, _flat_normal_volume(), "INFY")
     assert verdict.reason != "headline_plus_pricevol"
     assert verdict.fires is False

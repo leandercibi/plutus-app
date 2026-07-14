@@ -39,7 +39,7 @@ def test_atr_normalized_not_fixed_drop() -> None:
     trigger = ATRNormalizedTrigger()
     last = Decimal("100")
 
-    low_atr = 0.01   # 1% ATR (FMCG-like)
+    low_atr = 0.01  # 1% ATR (FMCG-like)
     high_atr = 0.05  # 5% ATR (high-beta smallcap)
 
     seq = 3

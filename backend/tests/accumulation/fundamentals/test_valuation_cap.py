@@ -15,9 +15,7 @@ def test_valuation_cap_no_inputs_exceed_30() -> None:
     """A12 hallmark: a screaming-cheap value trap (or any input combo) cannot score > 30."""
     valuation = Valuation()
     # extreme cheap, extreme growth, extreme everything
-    extreme_growth = _history(
-        [(2020, 1.0), (2021, 5.0), (2022, 20.0), (2023, 60.0), (2024, 200.0)]
-    )
+    extreme_growth = _history([(2020, 1.0), (2021, 5.0), (2022, 20.0), (2023, 60.0), (2024, 200.0)])
     extreme_cases = [
         ValuationInputs(
             pe_ttm=0.5,

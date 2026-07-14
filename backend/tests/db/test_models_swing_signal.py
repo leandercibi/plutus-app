@@ -28,9 +28,7 @@ def _signal(
         expectancy_R=0.42,
         drawn_rr=1.8,
         regime_at_signal="BULL",
-        pillar_breakdown_json=(
-            pillars if pillars is not None else {"trend": 30, "flow": 12}
-        ),
+        pillar_breakdown_json=(pillars if pillars is not None else {"trend": 30, "flow": 12}),
         counterfactual_text=counterfactual,
         created_at=datetime(2025, 1, 1, 9, 15),
     )

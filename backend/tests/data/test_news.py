@@ -52,7 +52,5 @@ def test_unknown_symbol_returns_empty() -> None:
 
 def test_entities_populated_by_deterministic_ner() -> None:
     provider = _StubNews({"INFY": [_raw("u1", "Infosys and TCS sign pact")]})
-    out = fetch_headlines(
-        "INFY", provider=provider, symbol_aliases={"INFY": ["Infosys"]}
-    )
+    out = fetch_headlines("INFY", provider=provider, symbol_aliases={"INFY": ["Infosys"]})
     assert "Infosys" in out[0].entities

@@ -55,17 +55,11 @@ def test_matched_trade_count() -> None:
 
 
 def test_deterministic_with_same_seed() -> None:
-    a = RandomLiquidBaseline(seed=42).matched_trade_curve(
-        _trades(), _universe_at, _returns_for
-    )
-    b = RandomLiquidBaseline(seed=42).matched_trade_curve(
-        _trades(), _universe_at, _returns_for
-    )
+    a = RandomLiquidBaseline(seed=42).matched_trade_curve(_trades(), _universe_at, _returns_for)
+    b = RandomLiquidBaseline(seed=42).matched_trade_curve(_trades(), _universe_at, _returns_for)
     assert list(a.round(8)) == pytest.approx(list(b.round(8)))
 
 
 def test_starts_at_one() -> None:
-    curve = RandomLiquidBaseline(seed=42).matched_trade_curve(
-        _trades(), _universe_at, _returns_for
-    )
+    curve = RandomLiquidBaseline(seed=42).matched_trade_curve(_trades(), _universe_at, _returns_for)
     assert curve.iloc[0] == pytest.approx(1.0)

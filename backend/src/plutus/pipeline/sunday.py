@@ -5,7 +5,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from decimal import Decimal
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 import pandas as pd
 from sqlalchemy.orm import Session
@@ -218,10 +218,11 @@ def _score_and_classify(
     }
     score_keys = ("technical", "expectancy", "flow", "sentiment", "regime_fit", "fundamentals")
     total_score = sum(cast(int, pillar_bd[k]) for k in score_keys)
-    clf = classify(  # type: ignore[arg-type]
+    calibration_band = cast(Literal["low", "medium", "high"], pillar_bd["calibration_band"])
+    clf = classify(
         total_score,
         exp_result,
-        pillar_bd["calibration_band"],
+        calibration_band,
         cfg,
         hard_avoid=fundamentals_hard_avoid,
     )
@@ -341,7 +342,7 @@ def _execute_sunday_pipeline(
     errors: list[str] = []
     results = []
 
-    from plutus.scheduler.jobs import _delivery_df_from_db
+    from plutus.swing.scoring.watch_signal import _delivery_df_from_db
 
     with session_scope() as read_session:
         delivery_by_symbol = {

@@ -26,9 +26,7 @@ def test_total_cost_always_positive(qty: int, price: Decimal) -> None:
     qty_a=st.integers(min_value=1, max_value=1000),
     extra=st.integers(min_value=1, max_value=1000),
 )
-def test_round_trip_cost_monotone_in_qty(
-    price: Decimal, qty_a: int, extra: int
-) -> None:
+def test_round_trip_cost_monotone_in_qty(price: Decimal, qty_a: int, extra: int) -> None:
     smaller = _model.round_trip_cost(qty_a, price, price)
     larger = _model.round_trip_cost(qty_a + extra, price, price)
     assert larger >= smaller

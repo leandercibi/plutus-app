@@ -83,8 +83,7 @@ def test_score_capped_at_5_a8(scorer: SentimentScorer) -> None:
 def test_score_capped_at_zero_floor(scorer: SentimentScorer) -> None:
     # Strongly negative many headlines: capped contribution never goes below 0.
     headlines = [
-        _hl("INFY fraud probe downgrade scandal loss default", entities=["INFY"])
-        for _ in range(50)
+        _hl("INFY fraud probe downgrade scandal loss default", entities=["INFY"]) for _ in range(50)
     ]
     result = scorer.score(headlines, "INFY")
     assert result.raw_score < 0

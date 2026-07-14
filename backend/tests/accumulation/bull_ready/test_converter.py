@@ -55,8 +55,6 @@ def test_no_swing_setup_no_offer(converter: BullReadyConverter) -> None:
 
 
 def test_non_bull_regime_no_offer(converter: BullReadyConverter) -> None:
-    bear = RegimeVerdict(
-        label="BEAR", confidence="high", reasons=[], breadth_confirmed=True
-    )
+    bear = RegimeVerdict(label="BEAR", confidence="high", reasons=[], breadth_confirmed=True)
     outcome = converter.evaluate(_position(), bear, object())
     assert outcome.offer is False

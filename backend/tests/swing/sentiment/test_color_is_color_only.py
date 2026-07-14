@@ -39,9 +39,7 @@ def test_sentiment_color_has_only_text_field() -> None:
 
 @pytest.mark.hallmark
 def test_narrate_returns_color_only_offline() -> None:
-    colorist = SentimentColorist(
-        client=lambda prompt: "Markets reacted calmly to the news."
-    )
+    colorist = SentimentColorist(client=lambda prompt: "Markets reacted calmly to the news.")
     scorer = SentimentScorer(Settings(_env_file=None))
     score = scorer.score([_hl("INFY steady update")], "INFY")
     result = colorist.narrate([_hl("INFY steady update")], score)

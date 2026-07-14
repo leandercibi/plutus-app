@@ -3,9 +3,7 @@ from __future__ import annotations
 from fastapi.testclient import TestClient
 
 
-def test_candidates_schema_and_hard_avoid(
-    client: TestClient, auth_headers: dict[str, str]
-) -> None:
+def test_candidates_schema_and_hard_avoid(client: TestClient, auth_headers: dict[str, str]) -> None:
     resp = client.get("/accumulation/candidates?run_id=run-1", headers=auth_headers)
     assert resp.status_code == 200
     rows = {r["symbol"]: r for r in resp.json()}

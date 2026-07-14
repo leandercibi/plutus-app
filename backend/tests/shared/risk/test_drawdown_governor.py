@@ -46,9 +46,7 @@ def test_at_trigger_multiplier_halves(governor: DrawdownGovernor) -> None:
     assert mult == 0.5
 
 
-def test_three_recovery_days_restore_to_one(
-    governor: DrawdownGovernor, session: Session
-) -> None:
+def test_three_recovery_days_restore_to_one(governor: DrawdownGovernor, session: Session) -> None:
     hwm = Decimal("1000000")
     d0 = date(2025, 1, 1)
     # trigger the drawdown
@@ -63,9 +61,7 @@ def test_three_recovery_days_restore_to_one(
     assert mult == 1.0
 
 
-def test_two_recovery_then_dip_stays_halved(
-    governor: DrawdownGovernor, session: Session
-) -> None:
+def test_two_recovery_then_dip_stays_halved(governor: DrawdownGovernor, session: Session) -> None:
     hwm = Decimal("1000000")
     d0 = date(2025, 1, 1)
     governor.current_risk_multiplier(hwm, Decimal("910000"))

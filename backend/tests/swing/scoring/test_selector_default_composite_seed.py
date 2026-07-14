@@ -26,9 +26,7 @@ def _sig(bundle: str) -> BundleSignal:
 
 
 def _stat(bundle: str, regime: str, sharpe: float, n: int = 50) -> BundleRegimeStat:
-    return BundleRegimeStat(
-        bundle=bundle, regime=regime, oos_sharpe_shrunk=sharpe, n_trades=n
-    )
+    return BundleRegimeStat(bundle=bundle, regime=regime, oos_sharpe_shrunk=sharpe, n_trades=n)
 
 
 def test_ranks_by_oos_per_regime_shrunk_sharpe() -> None:

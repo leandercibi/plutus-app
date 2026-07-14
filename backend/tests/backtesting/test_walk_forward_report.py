@@ -1,14 +1,19 @@
 from __future__ import annotations
 
-from plutus.backtesting.walk_forward import WFWindowResult, WalkForwardReport
+from plutus.backtesting.walk_forward import WalkForwardReport, WFWindowResult
 
 
 def _windows(pairs: list[tuple[float, float]]) -> list[WFWindowResult]:
-    return [WFWindowResult(is_sharpe=is_, oos_sharpe=oos, is_trades=5, oos_trades=3) for is_, oos in pairs]
+    return [
+        WFWindowResult(is_sharpe=is_, oos_sharpe=oos, is_trades=5, oos_trades=3)
+        for is_, oos in pairs
+    ]
 
 
 def _overfit_ratio(windows: list[WFWindowResult]) -> float:
-    n = sum(1 for w in windows if w.is_sharpe > 0 and (w.is_sharpe - w.oos_sharpe) / w.is_sharpe > 0.5)
+    n = sum(
+        1 for w in windows if w.is_sharpe > 0 and (w.is_sharpe - w.oos_sharpe) / w.is_sharpe > 0.5
+    )
     return n / len(windows) if windows else 0.0
 
 
@@ -44,8 +49,9 @@ def test_walk_forward_report_fields() -> None:
 
 
 def test_walk_forward_run_model_exists() -> None:
-    from plutus.db.models import WalkForwardRun
     from datetime import datetime
+
+    from plutus.db.models import WalkForwardRun
 
     row = WalkForwardRun(
         symbol="RELIANCE",

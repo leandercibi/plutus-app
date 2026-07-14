@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date
 from unittest.mock import patch
 
 import pandas as pd
@@ -50,9 +50,7 @@ def test_chart_returns_bars_and_latest_price(
 
 
 @pytest.mark.usefixtures("_mock_yfinance")
-def test_chart_includes_dma_values(
-    client: TestClient, auth_headers: dict[str, str]
-) -> None:
+def test_chart_includes_dma_values(client: TestClient, auth_headers: dict[str, str]) -> None:
     r = client.get("/shared/chart/INFY", headers=auth_headers)
     bars = r.json()["bars"]
     last = bars[-1]
@@ -81,9 +79,7 @@ def test_chart_without_signal_has_no_marker(
 
 
 @pytest.mark.usefixtures("_mock_yfinance")
-def test_chart_latest_change_pct(
-    client: TestClient, auth_headers: dict[str, str]
-) -> None:
+def test_chart_latest_change_pct(client: TestClient, auth_headers: dict[str, str]) -> None:
     r = client.get("/shared/chart/INFY", headers=auth_headers)
     body = r.json()
     assert isinstance(body["latest_change_pct"], float)

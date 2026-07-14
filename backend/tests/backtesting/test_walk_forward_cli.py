@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 from click.testing import CliRunner
 
-from plutus.backtesting.walk_forward import WFWindowResult, WalkForwardReport, cli
+from plutus.backtesting.walk_forward import WalkForwardReport, WFWindowResult, cli
 
 
 def _report(overfit: bool = False) -> WalkForwardReport:

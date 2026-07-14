@@ -43,12 +43,8 @@ def test_adv_cap_bites_for_large_position(sizer: PositionSizer) -> None:
 
 
 def test_drawdown_governor_halves_qty(sizer: PositionSizer) -> None:
-    full = sizer.compute_qty(
-        Decimal("100"), Decimal("95"), Decimal("1000000"), 10_000_000, 1.0
-    )
-    halved = sizer.compute_qty(
-        Decimal("100"), Decimal("95"), Decimal("1000000"), 10_000_000, 0.5
-    )
+    full = sizer.compute_qty(Decimal("100"), Decimal("95"), Decimal("1000000"), 10_000_000, 1.0)
+    halved = sizer.compute_qty(Decimal("100"), Decimal("95"), Decimal("1000000"), 10_000_000, 0.5)
     assert halved == full // 2
 
 

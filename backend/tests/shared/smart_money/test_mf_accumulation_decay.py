@@ -12,9 +12,7 @@ from plutus.shared.smart_money.mf_accumulation import (
 
 
 def _holdings(rows: list[tuple[date, float]]) -> pd.DataFrame:
-    return pd.DataFrame(
-        {"as_of": [r[0] for r in rows], "mf_holding_pct": [r[1] for r in rows]}
-    )
+    return pd.DataFrame({"as_of": [r[0] for r in rows], "mf_holding_pct": [r[1] for r in rows]})
 
 
 def test_rising_holdings_is_accumulating() -> None:
@@ -63,16 +61,12 @@ def test_decay_full_at_zero_days() -> None:
 
 def test_decay_half_at_sixty_days() -> None:
     frame = _holdings([(date(2024, 11, 1), 5.0), (date(2025, 1, 1), 7.0)])
-    out = MFAccumulation().evaluate(
-        frame, as_of=date(2025, 3, 2)
-    )  # 60 days after Jan 1
+    out = MFAccumulation().evaluate(frame, as_of=date(2025, 3, 2))  # 60 days after Jan 1
     assert out.age_days == 60
     assert out.confidence_after_decay == pytest.approx(0.5)
 
 
 def test_decay_zero_at_or_beyond_120_days() -> None:
     frame = _holdings([(date(2024, 6, 1), 5.0), (date(2024, 11, 1), 7.0)])
-    out = MFAccumulation().evaluate(
-        frame, as_of=date(2025, 3, 1)
-    )  # >120 days after Nov 1
+    out = MFAccumulation().evaluate(frame, as_of=date(2025, 3, 1))  # >120 days after Nov 1
     assert out.confidence_after_decay == pytest.approx(0.0)

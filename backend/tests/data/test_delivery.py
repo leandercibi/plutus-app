@@ -44,9 +44,7 @@ def test_delivery_pct_clipped_to_unit_range() -> None:
 
 def test_missing_day_becomes_nan_not_zero() -> None:
     idx = pd.date_range("2025-01-01", periods=2, freq="D")
-    raw = pd.DataFrame(
-        {"delivery_qty": [500, np.nan], "traded_qty": [1000, np.nan]}, index=idx
-    )
+    raw = pd.DataFrame({"delivery_qty": [500, np.nan], "traded_qty": [1000, np.nan]}, index=idx)
     provider = _StubDelivery(raw)
     out = fetch_delivery("INFY", date(2025, 1, 1), date(2025, 1, 2), provider)
     assert np.isnan(out["delivery_pct"].iloc[1])

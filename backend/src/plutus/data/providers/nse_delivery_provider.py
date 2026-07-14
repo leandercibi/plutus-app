@@ -50,7 +50,9 @@ class NseDeliveryProvider:
         df.columns = [c.strip() for c in df.columns]
         required = {"SYMBOL", "SERIES", "TTL_TRD_QNTY", "DELIV_QTY", "DELIV_PER"}
         if not required.issubset(df.columns):
-            logger.warning("bhavcopy for %s missing expected columns: %s", as_of, df.columns.tolist())
+            logger.warning(
+                "bhavcopy for %s missing expected columns: %s", as_of, df.columns.tolist()
+            )
             return _empty()
 
         for col in ("SYMBOL", "SERIES"):
@@ -60,9 +62,15 @@ class NseDeliveryProvider:
         out = pd.DataFrame(
             {
                 "symbol": df["SYMBOL"],
-                "delivery_qty": pd.to_numeric(df["DELIV_QTY"], errors="coerce").fillna(0).astype(int),
-                "traded_qty": pd.to_numeric(df["TTL_TRD_QNTY"], errors="coerce").fillna(0).astype(int),
-                "delivery_pct": (pd.to_numeric(df["DELIV_PER"], errors="coerce") / 100.0).fillna(0.0),
+                "delivery_qty": pd.to_numeric(df["DELIV_QTY"], errors="coerce")
+                .fillna(0)
+                .astype(int),
+                "traded_qty": pd.to_numeric(df["TTL_TRD_QNTY"], errors="coerce")
+                .fillna(0)
+                .astype(int),
+                "delivery_pct": (pd.to_numeric(df["DELIV_PER"], errors="coerce") / 100.0).fillna(
+                    0.0
+                ),
             }
         )
         return out.dropna(subset=["symbol"]).reset_index(drop=True)

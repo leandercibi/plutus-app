@@ -34,9 +34,7 @@ def test_committed_capital_never_moved(alloc: Allocation) -> None:
     total = Decimal("1000000")
     committed_swing = Decimal("400000")
     committed_accum = Decimal("300000")
-    plan = alloc.reallocate_uncommitted(
-        total, committed_swing, committed_accum, _regime("BULL")
-    )
+    plan = alloc.reallocate_uncommitted(total, committed_swing, committed_accum, _regime("BULL"))
     # committed amounts are preserved exactly
     assert plan.committed_swing == committed_swing
     assert plan.committed_accumulation == committed_accum

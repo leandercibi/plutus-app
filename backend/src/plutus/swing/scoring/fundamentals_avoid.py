@@ -48,7 +48,9 @@ def fundamentals_score(roce: float, pe_ttm: float | None) -> int:
     """
     roce_pts = min(max(roce, 0.0) / _ROCE_FULL_POINTS_AT, 1.0) * 5.0
     if pe_ttm is not None and pe_ttm > 0:
-        valuation_pts = min(max((_PE_EXPENSIVE - pe_ttm) / (_PE_EXPENSIVE - _PE_CHEAP), 0.0), 1.0) * 5.0
+        valuation_pts = (
+            min(max((_PE_EXPENSIVE - pe_ttm) / (_PE_EXPENSIVE - _PE_CHEAP), 0.0), 1.0) * 5.0
+        )
     else:
         valuation_pts = 0.0
     return int(round(roce_pts + valuation_pts))

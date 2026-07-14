@@ -106,17 +106,13 @@ def test_divergence_report_computes_stats() -> None:
         session=s,
     )
     s.commit()
-    report = slippage_divergence_report(
-        timedelta(days=30), session=s, now=datetime(2025, 1, 10)
-    )
+    report = slippage_divergence_report(timedelta(days=30), session=s, now=datetime(2025, 1, 10))
     assert report.n_pairs == 1
     assert report.mean_bps > 0
 
 
 def test_divergence_report_empty_window_no_crash() -> None:
     s = _session()
-    report = slippage_divergence_report(
-        timedelta(days=1), session=s, now=datetime(2025, 1, 10)
-    )
+    report = slippage_divergence_report(timedelta(days=1), session=s, now=datetime(2025, 1, 10))
     assert report.n_pairs == 0
     assert report.mean_bps == 0.0

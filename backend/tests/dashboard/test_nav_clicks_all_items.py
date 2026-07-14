@@ -27,6 +27,5 @@ def test_clicking_nav_item_does_not_crash(nav_label: str) -> None:
     btn.click().run()
 
     assert not at.exception, (
-        f"Clicking '{nav_label}' raised: "
-        f"{[str(e.value) for e in at.exception]}"
+        f"Clicking '{nav_label}' raised: {[str(e.value) for e in at.exception]}"
     )

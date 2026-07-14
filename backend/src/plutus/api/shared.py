@@ -127,12 +127,16 @@ def get_quick_score(
 
     from plutus.data.providers.fundamentals_provider import FundamentalsProvider
     from plutus.data.providers.yfinance_provider import YFinanceProvider
-    from plutus.scheduler.jobs import _delivery_df_from_db, _FallbackCalibration, _make_watch_signal
     from plutus.shared.cost_model.costs import CostModel
     from plutus.swing.scoring.flow_pillar import flow_score_from_history
     from plutus.swing.scoring.fundamentals_avoid import (
         evaluate_fundamentals_avoid,
         fundamentals_score,
+    )
+    from plutus.swing.scoring.watch_signal import (
+        _delivery_df_from_db,
+        _FallbackCalibration,
+        _make_watch_signal,
     )
 
     symbol = symbol.strip().upper()
@@ -703,7 +707,9 @@ def _fetch_live_prices(
     live_symbols = symbols - freshly_cached_symbols - still_missing
     for sym in live_symbols:
         price = prices[sym]
-        existing = db.execute(select(LatestPrice).where(LatestPrice.symbol == sym)).scalars().first()
+        existing = (
+            db.execute(select(LatestPrice).where(LatestPrice.symbol == sym)).scalars().first()
+        )
         if existing:
             existing.price = D(str(round(price, 2)))
             existing.source = source

@@ -48,9 +48,7 @@ def test_de_breach_exempt_for_financial(hard_avoid: HardAvoid) -> None:
 
 
 def test_eps_collapse_fires(hard_avoid: HardAvoid) -> None:
-    result = hard_avoid.evaluate(
-        _snapshot(last_eps_yoy_change=-0.60, improving_guidance=False)
-    )
+    result = hard_avoid.evaluate(_snapshot(last_eps_yoy_change=-0.60, improving_guidance=False))
     assert result.avoid is True
     assert any("EPS" in r for r in result.reasons)
 
@@ -58,9 +56,7 @@ def test_eps_collapse_fires(hard_avoid: HardAvoid) -> None:
 def test_eps_collapse_with_improving_guidance_does_not_fire(
     hard_avoid: HardAvoid,
 ) -> None:
-    result = hard_avoid.evaluate(
-        _snapshot(last_eps_yoy_change=-0.60, improving_guidance=True)
-    )
+    result = hard_avoid.evaluate(_snapshot(last_eps_yoy_change=-0.60, improving_guidance=True))
     assert result.avoid is False
 
 

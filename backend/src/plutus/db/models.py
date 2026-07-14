@@ -322,7 +322,9 @@ class DailyDelivery(Base):
     traded_qty: Mapped[int]
     delivery_pct: Mapped[float]
 
-    __table_args__ = (UniqueConstraint("symbol", "as_of_date", name="uq_daily_delivery_symbol_date"),)
+    __table_args__ = (
+        UniqueConstraint("symbol", "as_of_date", name="uq_daily_delivery_symbol_date"),
+    )
 
 
 class DrawdownGovernorState(Base):

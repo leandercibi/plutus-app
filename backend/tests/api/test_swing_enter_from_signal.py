@@ -42,9 +42,7 @@ def test_enter_from_signal_defaults_cost_inr_to_zero(
     assert resp.json()["cost_inr"] == "0"
 
 
-def test_enter_from_signal_persists_to_db(
-    client: TestClient, auth_headers: dict[str, str]
-) -> None:
+def test_enter_from_signal_persists_to_db(client: TestClient, auth_headers: dict[str, str]) -> None:
     """After entering, the trade must be visible in GET /swing/positions."""
     body = {"side": "BUY", "qty": 25, "price": "1505.50"}
     fill_resp = client.post("/swing/signals/1/enter", json=body, headers=auth_headers)

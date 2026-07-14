@@ -12,6 +12,7 @@ Covers:
 
 from __future__ import annotations
 
+import contextlib
 import threading
 import time
 
@@ -19,24 +20,22 @@ import pytest
 
 import plutus.data.providers.angelone_provider as _mod
 from plutus.data.providers.angelone_provider import (
-    RateLimitSaturated,
-    USER_RATE_LIMIT_TIMEOUT,
     _MIN_INTERVAL,
+    USER_RATE_LIMIT_TIMEOUT,
+    RateLimitSaturated,
     _rate_wait,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _reset_rate_state() -> None:
     """Reset module-level rate-limiter state between tests."""
     # Release the lock if somehow held (shouldn't happen, but defensive)
-    try:
+    with contextlib.suppress(RuntimeError):
         _mod._RATE_LOCK.release()
-    except RuntimeError:
-        pass
     _mod._LAST_CALL[0] = 0.0
 
 
@@ -51,6 +50,7 @@ def reset_rate(monkeypatch):
 # ---------------------------------------------------------------------------
 # Interval enforcement
 # ---------------------------------------------------------------------------
+
 
 def test_two_consecutive_calls_respect_min_interval():
     t0 = time.monotonic()
@@ -78,6 +78,7 @@ def test_calls_far_apart_do_not_add_artificial_delay():
 # Timeout=None: blocks indefinitely
 # ---------------------------------------------------------------------------
 
+
 def test_background_caller_blocks_until_lock_released():
     """A timeout=None caller must wait for a held lock and then succeed."""
     _mod._RATE_LOCK.acquire()  # simulate lock held by another thread
@@ -86,7 +87,7 @@ def test_background_caller_blocks_until_lock_released():
 
     def background_call():
         try:
-            _rate_wait(timeout=None)   # should block
+            _rate_wait(timeout=None)  # should block
             results.append("ok")
         except RateLimitSaturated:
             results.append("saturated")
@@ -107,6 +108,7 @@ def test_background_caller_blocks_until_lock_released():
 # Timeout=float: fails fast
 # ---------------------------------------------------------------------------
 
+
 def test_user_caller_raises_when_lock_held():
     """A user-facing caller with a short timeout must raise RateLimitSaturated."""
     _mod._RATE_LOCK.acquire()  # hold the lock
@@ -121,10 +123,8 @@ def test_lock_released_after_rate_limit_saturated():
     """After RateLimitSaturated the lock must not be held — next call succeeds."""
     _mod._RATE_LOCK.acquire()
 
-    try:
+    with contextlib.suppress(RateLimitSaturated):
         _rate_wait(timeout=0.05)
-    except RateLimitSaturated:
-        pass
 
     _mod._RATE_LOCK.release()  # release what we acquired above
 
@@ -152,6 +152,7 @@ def test_user_timeout_value_is_respected():
 # ---------------------------------------------------------------------------
 # Concurrent scenario: cron sweeping + user refresh
 # ---------------------------------------------------------------------------
+
 
 def test_concurrent_background_and_user_calls():
     """Simulates a cron sweep holding the lock while a user refresh arrives.
@@ -198,6 +199,7 @@ def test_concurrent_background_and_user_calls():
 # ---------------------------------------------------------------------------
 # AngelOneProvider construction wires the timeout correctly
 # ---------------------------------------------------------------------------
+
 
 def test_provider_default_timeout_is_none(monkeypatch):
     """AngelOneProvider() with no rate_limit_timeout passes None to _rate_wait."""

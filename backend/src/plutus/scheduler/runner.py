@@ -441,7 +441,11 @@ def _build_daily_delivery_fetch_callable(settings: Settings):  # type: ignore[no
         def work(session):  # type: ignore[no-untyped-def]
             now = datetime.now(tz=UTC).replace(tzinfo=None)
             result = daily_delivery_fetch_job(session, now)
-            return {"status": result.status, "aborted_reason": result.aborted_reason, "kept": result.kept}
+            return {
+                "status": result.status,
+                "aborted_reason": result.aborted_reason,
+                "kept": result.kept,
+            }
 
         _run_with_runlog("daily_delivery_fetch", work)
 

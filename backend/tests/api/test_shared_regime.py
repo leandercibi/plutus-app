@@ -14,9 +14,7 @@ def test_latest_regime_returns_most_recent(
     assert body["breadth_confirmed_flip"] is True
 
 
-def test_regime_history_returns_list(
-    client: TestClient, auth_headers: dict[str, str]
-) -> None:
+def test_regime_history_returns_list(client: TestClient, auth_headers: dict[str, str]) -> None:
     resp = client.get("/shared/regime/history?days=30", headers=auth_headers)
     assert resp.status_code == 200
     rows = resp.json()

@@ -8,13 +8,9 @@ def _position_id(client: TestClient, headers: dict[str, str]) -> int:
     return int(positions[0]["id"])
 
 
-def test_convert_creates_swing_trade(
-    client: TestClient, auth_headers: dict[str, str]
-) -> None:
+def test_convert_creates_swing_trade(client: TestClient, auth_headers: dict[str, str]) -> None:
     pid = _position_id(client, auth_headers)
-    resp = client.post(
-        f"/accumulation/positions/{pid}/convert-to-swing", headers=auth_headers
-    )
+    resp = client.post(f"/accumulation/positions/{pid}/convert-to-swing", headers=auth_headers)
     assert resp.status_code == 200
     trade = resp.json()
     assert trade["symbol"] == "HDFCBANK"
@@ -22,9 +18,7 @@ def test_convert_creates_swing_trade(
     assert trade["bundle"] == "bull_ready"
 
 
-def test_convert_sets_position_state(
-    client: TestClient, auth_headers: dict[str, str]
-) -> None:
+def test_convert_sets_position_state(client: TestClient, auth_headers: dict[str, str]) -> None:
     pid = _position_id(client, auth_headers)
     client.post(f"/accumulation/positions/{pid}/convert-to-swing", headers=auth_headers)
     positions = client.get("/accumulation/positions", headers=auth_headers).json()
@@ -32,12 +26,8 @@ def test_convert_sets_position_state(
     assert converted["state"] == "CONVERTED_TO_SWING"
 
 
-def test_convert_twice_conflicts(
-    client: TestClient, auth_headers: dict[str, str]
-) -> None:
+def test_convert_twice_conflicts(client: TestClient, auth_headers: dict[str, str]) -> None:
     pid = _position_id(client, auth_headers)
     client.post(f"/accumulation/positions/{pid}/convert-to-swing", headers=auth_headers)
-    resp = client.post(
-        f"/accumulation/positions/{pid}/convert-to-swing", headers=auth_headers
-    )
+    resp = client.post(f"/accumulation/positions/{pid}/convert-to-swing", headers=auth_headers)
     assert resp.status_code == 409

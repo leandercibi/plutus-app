@@ -4,9 +4,7 @@ from pathlib import Path
 
 import pytest
 
-_SMART_MONEY_DIR = (
-    Path(__file__).parents[3] / "src" / "plutus" / "shared" / "smart_money"
-)
+_SMART_MONEY_DIR = Path(__file__).parents[3] / "src" / "plutus" / "shared" / "smart_money"
 
 
 @pytest.mark.hallmark

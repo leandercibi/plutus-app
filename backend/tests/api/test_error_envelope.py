@@ -35,9 +35,7 @@ def test_unhandled_exception_returns_sanitized_500(
     app.dependency_overrides[get_app_settings] = lambda: settings
     # do not raise server exceptions so the handler is exercised
     with TestClient(app, raise_server_exceptions=False) as c:
-        resp = c.get(
-            "/shared/regime", headers={"Authorization": f"Bearer {TEST_TOKEN}"}
-        )
+        resp = c.get("/shared/regime", headers={"Authorization": f"Bearer {TEST_TOKEN}"})
     assert resp.status_code == 500
     body = resp.json()
     assert set(body.keys()) == {"code", "message", "request_id"}

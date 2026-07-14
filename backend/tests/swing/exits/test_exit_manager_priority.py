@@ -72,9 +72,7 @@ def test_no_exit_when_nothing_triggers(manager: ExitManager) -> None:
         {
             "high": [Decimal(str(h)) for h in [101, 103, 105, 107, 108, 109]],
             "low": [Decimal(str(lo)) for lo in [100, 102, 104, 106, 107, 108]],
-            "close": [
-                Decimal(str(c)) for c in [100.5, 102.5, 104.5, 106.5, 107.5, 108.5]
-            ],
+            "close": [Decimal(str(c)) for c in [100.5, 102.5, 104.5, 106.5, 107.5, 108.5]],
         }
     )
     today_bar = OHLCBar(

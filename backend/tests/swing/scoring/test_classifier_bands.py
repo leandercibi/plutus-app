@@ -7,9 +7,7 @@ from plutus.swing.scoring.classifier import classify
 from plutus.swing.scoring.expectancy import ExpectancyResult
 
 
-def _exp(
-    expectancy_R: float, *, primary: bool, fallback: bool = False
-) -> ExpectancyResult:
+def _exp(expectancy_R: float, *, primary: bool, fallback: bool = False) -> ExpectancyResult:
     return ExpectancyResult(
         expectancy_R=expectancy_R,
         p_t1=0.5,

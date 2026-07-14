@@ -33,7 +33,9 @@ def test_sidebar_renders_all_expected_items() -> None:
     # Sidebar uses st.button per nav item (not st.radio).
     button_labels = {str(b.label) for b in at.sidebar.button}
     for item in _EXPECTED_ITEMS:
-        assert item in button_labels, f"Nav button '{item}' not found in sidebar buttons: {button_labels}"
+        assert item in button_labels, (
+            f"Nav button '{item}' not found in sidebar buttons: {button_labels}"
+        )
 
 
 def test_nav_item_labels_match_spec_order() -> None:

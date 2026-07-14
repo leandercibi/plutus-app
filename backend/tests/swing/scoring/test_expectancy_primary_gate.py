@@ -90,7 +90,5 @@ def test_costs_reduce_expectancy(costs: CostModel) -> None:
     )
     settings = Settings(_env_file=None)
     with_costs = compute_expectancy(_inputs(), calib, costs, settings=settings)
-    no_costs = compute_expectancy(
-        _inputs(), calib, _ZeroCost(settings), settings=settings
-    )
+    no_costs = compute_expectancy(_inputs(), calib, _ZeroCost(settings), settings=settings)
     assert with_costs.expectancy_R < no_costs.expectancy_R

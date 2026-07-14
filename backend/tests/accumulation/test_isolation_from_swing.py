@@ -5,9 +5,7 @@ from pathlib import Path
 
 import pytest
 
-_ACCUMULATION_ROOT = (
-    Path(__file__).resolve().parents[2] / "src" / "plutus" / "accumulation"
-)
+_ACCUMULATION_ROOT = Path(__file__).resolve().parents[2] / "src" / "plutus" / "accumulation"
 
 
 def _imported_modules(source: str) -> set[str]:

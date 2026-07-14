@@ -20,9 +20,7 @@ def _position() -> AccumulationPosition:
 
 
 def _bull() -> RegimeVerdict:
-    return RegimeVerdict(
-        label="BULL", confidence="high", reasons=[], breadth_confirmed=True
-    )
+    return RegimeVerdict(label="BULL", confidence="high", reasons=[], breadth_confirmed=True)
 
 
 def test_auto_convert_off_by_default() -> None:

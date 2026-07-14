@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from tests.dashboard.fixtures import signal_view
-from tests.dashboard.helpers import all_caption, all_markdown, run_window
+from tests.dashboard.helpers import all_markdown, run_window
 
 
 def test_six_pillar_bars_present() -> None:
@@ -31,15 +31,15 @@ def test_entry_sl_t1_t2_row_present() -> None:
     at = run_window("signals", [signal_view()])
     # entry/sl/t1/t2 rendered inside HTML <b> tags — values are in the markdown string
     md = all_markdown(at)
-    assert "₹1,500.50" in md   # entry
-    assert "₹1,440.00" in md   # stop_loss
-    assert "₹1,620.00" in md   # target_1
+    assert "₹1,500.50" in md  # entry
+    assert "₹1,440.00" in md  # stop_loss
+    assert "₹1,620.00" in md  # target_1
 
 
 def test_chip_strip_present() -> None:
     at = run_window("signals", [signal_view()])
     # chips rendered via st.markdown (not st.caption); format is :.0f
     md = all_markdown(at)
-    assert "delivery 44%" in md     # delivery_pct=44.5 → "44%" with :.0f
+    assert "delivery 44%" in md  # delivery_pct=44.5 → "44%" with :.0f
     # circuit_hits_90d=0 → chip suppressed (only shown when > 0)
     assert "circuit hits" not in md
