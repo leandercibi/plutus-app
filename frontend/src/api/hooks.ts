@@ -267,6 +267,20 @@ export function useStartAccumulationPosition() {
   })
 }
 
+// Adds a subsequent tranche (2..5) to an already-open accumulation position.
+// Backend enforces max-5 tranches and 409s on closed positions.
+export function useAddTranche() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ positionId, price, qty, note = '' }: { positionId: number; price: number; qty: number; note?: string }) =>
+      apiClient.post(`/accumulation/positions/${positionId}/tranches`, { price, qty, note }).then(r => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['accumulation-positions'] })
+      qc.invalidateQueries({ queryKey: ['portfolio-snapshot'] })
+    },
+  })
+}
+
 export function useAccumulationPositions() {
   return useQuery({
     queryKey: ['accumulation-positions'],

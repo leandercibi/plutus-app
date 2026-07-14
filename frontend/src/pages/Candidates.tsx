@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from 'react'
 import {
   useCandidates,
   useStartAccumulationPosition,
+  useAddTranche,
   useAccumulationPositions,
   useLTP,
 } from '../api/hooks'
@@ -46,25 +47,50 @@ function AccumModal({
   const [note, setNote] = useState('')
 
   const startPos = useStartAccumulationPosition()
+  const addTranche = useAddTranche()
 
   // Pre-fill price with CMP once loaded
   useEffect(() => {
     if (cmp != null && price === '') setPrice(cmp.toFixed(2))
   }, [cmp])
 
-  const existing = positions.filter(p => p.symbol === candidate.symbol && p.state !== 'CLOSED')
-  const trancheNum = existing.length + 1
+  // OPEN states only. EXITED / CONVERTED_TO_SWING positions are closed and
+  // must NOT bump the tranche counter — closing tranche 1 should let you
+  // restart at tranche 1, not jump straight to tranche 2.
+  const OPEN_STATES = new Set(['BUILDING', 'FULL', 'PAUSED'])
+  const openPositions = positions.filter(
+    p => p.symbol === candidate.symbol && OPEN_STATES.has(p.state),
+  )
+  // The existing OPEN position (there's at most one per symbol — backend
+  // enforces that). If present, submitting adds a tranche to it. If absent,
+  // submitting creates a brand-new position (tranche 1).
+  const existingOpenPos = openPositions[0] ?? null
 
   const priceVal = parseFloat(price)
   const qtyVal   = parseInt(qty, 10)
   const isValid  = !isNaN(priceVal) && priceVal > 0 && !isNaN(qtyVal) && qtyVal > 0
 
+  const pending = startPos.isPending || addTranche.isPending
+  const apiError =
+    (startPos.error && String(startPos.error)) ||
+    (addTranche.error && String(addTranche.error)) ||
+    null
+
   const handleSubmit = () => {
     if (!isValid) return
-    startPos.mutate(
-      { symbol: candidate.symbol, price: priceVal, qty: qtyVal, note: note.trim() || undefined },
-      { onSuccess: () => onClose() },
-    )
+    if (existingOpenPos) {
+      // Route to the tranche endpoint — the create endpoint would 409 because
+      // an open position already exists for this symbol.
+      addTranche.mutate(
+        { positionId: existingOpenPos.id, price: priceVal, qty: qtyVal, note: note.trim() || undefined },
+        { onSuccess: () => onClose() },
+      )
+    } else {
+      startPos.mutate(
+        { symbol: candidate.symbol, price: priceVal, qty: qtyVal, note: note.trim() || undefined },
+        { onSuccess: () => onClose() },
+      )
+    }
   }
 
   // Close on backdrop click
@@ -137,13 +163,13 @@ function AccumModal({
         </div>
 
         {/* Existing open positions */}
-        {existing.length > 0 && (
+        {openPositions.length > 0 && (
           <div>
             <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', marginBottom: 8, letterSpacing: '0.05em' }}>
               EXISTING OPEN POSITIONS
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {existing.map((p, i) => (
+              {openPositions.map((p, i) => (
                 <div key={p.id} style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                   background: 'var(--faint)', borderRadius: 8, padding: '8px 12px',
@@ -155,8 +181,10 @@ function AccumModal({
                   </div>
                   <span style={{
                     fontSize: 10, padding: '2px 7px', borderRadius: 4,
-                    background: p.state === 'ACTIVE' ? 'rgba(0,200,150,0.1)' : 'rgba(245,158,11,0.1)',
-                    color: p.state === 'ACTIVE' ? 'var(--green)' : 'var(--amber)',
+                    background: p.state === 'BUILDING' || p.state === 'FULL'
+                      ? 'rgba(0,200,150,0.1)'
+                      : 'rgba(245,158,11,0.1)',
+                    color: p.state === 'BUILDING' || p.state === 'FULL' ? 'var(--green)' : 'var(--amber)',
                     fontWeight: 700,
                   }}>{p.state}</span>
                 </div>
@@ -170,8 +198,20 @@ function AccumModal({
           fontSize: 12, fontWeight: 600, color: 'var(--blue)',
           borderTop: '1px solid var(--border)', paddingTop: 16,
         }}>
-          This will be Tranche {trancheNum}
+          {existingOpenPos
+            ? `This will add a new tranche to the existing open position`
+            : `This will be Tranche 1 (fresh position)`}
         </div>
+
+        {apiError && (
+          <div style={{
+            fontSize: 12, color: 'var(--red)',
+            background: 'rgba(242,54,69,0.08)', border: '1px solid rgba(242,54,69,0.35)',
+            padding: '8px 12px', borderRadius: 8,
+          }}>
+            {apiError}
+          </div>
+        )}
 
         {/* Form */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -236,17 +276,22 @@ function AccumModal({
           >Cancel</button>
           <button
             onClick={handleSubmit}
-            disabled={!isValid || startPos.isPending}
+            disabled={!isValid || pending}
+            title={!isValid ? 'Enter both a price and share count' : undefined}
             style={{
               flex: 2, padding: '10px 0',
               background: isValid ? 'var(--green)' : 'var(--faint)',
               border: 'none', borderRadius: 10,
               color: isValid ? '#000' : 'var(--dim)',
-              fontSize: 13, fontWeight: 700, cursor: isValid ? 'pointer' : 'default',
-              opacity: startPos.isPending ? 0.6 : 1,
+              fontSize: 13, fontWeight: 700, cursor: isValid && !pending ? 'pointer' : 'not-allowed',
+              opacity: pending ? 0.6 : 1,
             }}
           >
-            {startPos.isPending ? 'Submitting…' : `Start Tranche ${trancheNum}`}
+            {pending
+              ? 'Submitting…'
+              : existingOpenPos
+                ? `Add tranche (+${qty || '—'} shares)`
+                : 'Start Tranche 1'}
           </button>
         </div>
       </div>
