@@ -62,16 +62,21 @@ def test_two_consecutive_calls_respect_min_interval():
     )
 
 
-def test_calls_far_apart_do_not_add_artificial_delay():
-    _rate_wait()
-    time.sleep(_MIN_INTERVAL + 0.05)  # already past the interval
-    t0 = time.monotonic()
-    _rate_wait()
-    elapsed = time.monotonic() - t0
-    # Should complete almost immediately — no extra sleep needed
-    assert elapsed < _MIN_INTERVAL, (
-        f"Unexpected extra delay: {elapsed:.3f}s (threshold {_MIN_INTERVAL}s)"
-    )
+def test_calls_far_apart_do_not_add_artificial_delay(monkeypatch):
+    """When enough real time has already passed, _rate_wait must not add an
+    artificial extra sleep. Simulates the elapsed time by rewinding _LAST_CALL
+    instead of a real time.sleep(): a real wall-clock measurement here was
+    intermittently flaky under system load (OS scheduling jitter routinely
+    blew past the tight assertion threshold when the full suite was running)."""
+    sleep_calls: list[float] = []
+    monkeypatch.setattr(_mod.time, "sleep", lambda s: sleep_calls.append(s))
+
+    _rate_wait()  # first call — sets _LAST_CALL
+    _mod._LAST_CALL[0] -= _MIN_INTERVAL + 0.05  # simulate time already elapsed
+
+    _rate_wait()  # second call — should see it's already past the interval
+
+    assert sleep_calls == [], f"Unexpected artificial delay: slept for {sleep_calls}"
 
 
 # ---------------------------------------------------------------------------
@@ -99,7 +104,11 @@ def test_background_caller_blocks_until_lock_released():
     assert results == [], "Should still be blocked"
 
     _mod._RATE_LOCK.release()  # unblock it
-    t.join(timeout=2.0)
+    t.join(timeout=10.0)
+    # A thread still alive here would keep running after this test returns and could
+    # release/acquire the shared module-level lock mid-way through a later test —
+    # fail loudly now instead of leaking a zombie thread that corrupts other tests.
+    assert not t.is_alive(), "Background thread did not finish within the join timeout"
 
     assert results == ["ok"], "Background caller should have succeeded after lock released"
 
@@ -187,11 +196,16 @@ def test_concurrent_background_and_user_calls():
     usr.start()
 
     time.sleep(0.1)  # user call should have timed out by now
+    usr.join(timeout=10.0)
+    assert not usr.is_alive(), "User-facing thread did not finish within the join timeout"
     assert user_result == ["saturated"], "User-facing call should have given up quickly"
     assert background_result == [], "Background call should still be waiting"
 
     _mod._RATE_LOCK.release()
-    bg.join(timeout=2.0)
+    bg.join(timeout=10.0)
+    # Same reasoning as test_background_caller_blocks_until_lock_released: don't let
+    # a slow-under-load thread outlive this test and corrupt a later one's lock state.
+    assert not bg.is_alive(), "Background thread did not finish within the join timeout"
 
     assert background_result == ["ok"], "Background call should succeed once lock freed"
 

@@ -114,7 +114,7 @@ class BreadthYFinanceProvider:
         dma = closes.rolling(window, min_periods=window // 2).mean()
         above = (closes > dma).astype(float)
         result = above.mean(axis=1)
-        return result.loc[str(start) : str(end)].clip(0.0, 1.0)  # type: ignore[misc]
+        return result.loc[str(start) : str(end)].clip(0.0, 1.0)
 
     def fetch_advance_decline(self, start: date, end: date) -> pd.Series:
         closes = _fetch_closes(start, end)
@@ -125,4 +125,4 @@ class BreadthYFinanceProvider:
         adv = (daily_ret > 0).sum(axis=1)
         dec = (daily_ret < 0).sum(axis=1)
         ratio = adv / dec.replace(0, np.nan)
-        return ratio.fillna(1.0).loc[str(start) : str(end)]  # type: ignore[misc]
+        return ratio.fillna(1.0).loc[str(start) : str(end)]
