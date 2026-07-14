@@ -48,7 +48,7 @@ class FIIDIIStubProvider:
                 {"fii_net_inr_crore": fii / _CRORE, "dii_net_inr_crore": dii / _CRORE},
                 index=pct.index,
             )
-            return df.loc[str(start) : str(end)]
+            return df.loc[str(start) : str(end)]  # type: ignore[misc]
         except Exception as exc:
             logger.warning("FII/DII stub fetch failed: %s; returning zeros", exc)
             idx = pd.date_range(start, end, freq="B")
