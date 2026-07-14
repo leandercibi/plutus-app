@@ -92,6 +92,12 @@ class EnterFromSignalIn(BaseModel):
 
 class ManualExitIn(BaseModel):
     reason: str
+    # When set, sell only this many shares (partial exit): logs a SELL Fill for `qty`
+    # at `price` (or CMP if omitted), decrements trade.qty, leaves state OPEN /
+    # T1_HIT if any qty remains. When omitted or >= remaining trade.qty, whole trade
+    # closes as before (state → CLOSED_WIN/CLOSED_LOSS).
+    qty: int | None = None
+    price: Decimal | None = None
 
 
 class CooldownRowOut(BaseModel):

@@ -110,6 +110,11 @@ class PositionSnapshotOut(BaseModel):
     pnl_pct: float
     stop_loss: float | None = None
     sl_distance_pct: float | None = None
+    # Per-lot identity: populated for swing trades (one row per SwingTrade) so the
+    # frontend can group multi-lot positions by symbol and dispatch actions to the
+    # right specific trade. None for accumulation, which is inherently one-per-symbol.
+    trade_id: int | None = None
+    opened_at: datetime | None = None
 
 
 class PortfolioSnapshotOut(BaseModel):

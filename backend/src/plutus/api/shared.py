@@ -803,6 +803,8 @@ def compute_portfolio_snapshot(db: Session, settings: Settings) -> PortfolioSnap
                 pnl_pct=round(((current - invested) / invested) * 100, 2) if invested else 0.0,
                 stop_loss=sl,
                 sl_distance_pct=round(sl_dist, 2) if sl_dist is not None else None,
+                trade_id=trade.id,
+                opened_at=trade.opened_at,
             )
         )
 
