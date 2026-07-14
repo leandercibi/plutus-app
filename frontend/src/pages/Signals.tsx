@@ -1,9 +1,13 @@
 import { useState, useMemo, useEffect } from 'react'
-import { useSignals, useChart, useEnterSignal, useSwingPositions, useLTP } from '../api/hooks'
+import { useSignals, useEnterSignal, useSwingPositions, useLTP } from '../api/hooks'
 import { PillarBar } from '../components/ui/PillarBar'
 import { Skeleton } from '../components/ui/Skeleton'
 import { ErrorBanner } from '../components/ui/ErrorBanner'
-import { StockChart } from '../components/chart/StockChart'
+import {
+  useChartPanel, ChartToggleButton, ChartPanelBody, DaysControl, OverlayControls,
+  DEFAULT_CHART_INDICATORS, type ChartIndicators,
+} from '../components/chart/ChartPanel'
+import { QuickScoreWidget } from '../components/QuickScoreWidget'
 import type { SwingSignal } from '../types/api'
 
 const PILLAR_DEFS: { key: keyof SwingSignal['pillar_breakdown']; label: string }[] = [
@@ -29,7 +33,6 @@ const ACCENT: Record<string, string> = {
   WATCH: 'var(--border)',
 }
 
-type Indicators = { macd: boolean; bb: boolean; goldenCross: boolean }
 type SortKey = 'score' | 'label'
 
 // ── Trade entry modal ─────────────────────────────────────────────────────────
@@ -311,12 +314,11 @@ function SignalCard({
 }: {
   signal: SwingSignal
   chartDays: number
-  indicators: Indicators
+  indicators: ChartIndicators
   ownedSymbols: Set<string>
 }) {
-  const [expanded, setExpanded] = useState(false)
   const [tradeModal, setTradeModal] = useState<'BUY' | 'SELL' | null>(null)
-  const chart = useChart(signal.symbol, signal.id, chartDays, expanded)
+  const { expanded, setExpanded, chart } = useChartPanel(signal.symbol, signal.id, chartDays)
 
   const labelStyle = LABEL_STYLE[signal.label] ?? LABEL_STYLE.WATCH
   const accentColor = ACCENT[signal.label] ?? 'var(--border)'
@@ -402,12 +404,7 @@ function SignalCard({
                 )}
               </>
             )}
-            <button onClick={() => setExpanded(e => !e)} style={{
-              padding: '7px 13px',
-              background: expanded ? 'var(--faint)' : 'transparent',
-              border: '1px solid var(--border)', borderRadius: 8,
-              color: 'var(--muted)', fontSize: 12, cursor: 'pointer',
-            }}>{expanded ? '▲' : '▼ Chart'}</button>
+            <ChartToggleButton expanded={expanded} onToggle={() => setExpanded(e => !e)} />
           </div>
         </div>
 
@@ -424,16 +421,7 @@ function SignalCard({
         {/* Chart */}
         {expanded && (
           <div style={{ borderTop: '1px solid var(--border)' }}>
-            {chart.isLoading ? (
-              <div style={{ padding: 16 }}><Skeleton h={320} /></div>
-            ) : chart.error ? (
-              <div style={{ padding: 16 }}><ErrorBanner message="Chart data unavailable" /></div>
-            ) : chart.data ? (
-              <StockChart
-                data={chart.data} height={320}
-                showMACD={indicators.macd} showBB={indicators.bb} showGoldenCross={indicators.goldenCross}
-              />
-            ) : null}
+            <ChartPanelBody chart={chart} indicators={indicators} height={320} />
             {signal.counterfactual && (
               <div style={{ padding: '10px 16px', borderTop: '1px solid var(--faint)', fontSize: 12, color: 'var(--dim)' }}>
                 {signal.counterfactual}
@@ -472,9 +460,9 @@ export default function Signals() {
   const [days, setDays]   = useState(90)
   const [sort, setSort]   = useState<SortKey>('score')
   const [labelFilter, setLabelFilter] = useState<string | null>(null)
-  const [indicators, setIndicators] = useState<Indicators>({ macd: false, bb: false, goldenCross: false })
+  const [indicators, setIndicators] = useState<ChartIndicators>(DEFAULT_CHART_INDICATORS)
 
-  const toggleInd = (k: keyof Indicators) =>
+  const toggleInd = (k: keyof ChartIndicators) =>
     setIndicators(prev => ({ ...prev, [k]: !prev[k] }))
 
   const sorted = useMemo(() => {
@@ -497,24 +485,15 @@ export default function Signals() {
   if (error) return <ErrorBanner message={String(error)} />
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 820 }}>
+    <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14, flex: 1, minWidth: 0, maxWidth: 820 }}>
       {/* Controls */}
       <div style={{
         display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center',
         background: 'var(--surface)', border: '1px solid var(--border)',
         borderRadius: 10, padding: '10px 14px',
       }}>
-        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-          <span style={{ fontSize: 11, color: 'var(--muted)', marginRight: 4 }}>Days</span>
-          {[30, 60, 90, 180, 365].map(d => (
-            <button key={d} onClick={() => setDays(d)} style={{
-              padding: '3px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600,
-              border: `1px solid ${days === d ? 'var(--blue)' : 'var(--border)'}`,
-              background: days === d ? 'var(--blue-bg)' : 'transparent',
-              color: days === d ? 'var(--blue)' : 'var(--muted)', cursor: 'pointer',
-            }}>{d}</button>
-          ))}
-        </div>
+        <DaysControl days={days} setDays={setDays} />
         <div style={{ width: 1, height: 20, background: 'var(--border)' }} />
         <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
           <span style={{ fontSize: 11, color: 'var(--muted)', marginRight: 4 }}>Sort</span>
@@ -535,21 +514,7 @@ export default function Signals() {
           ))}
         </div>
         <div style={{ width: 1, height: 20, background: 'var(--border)' }} />
-        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-          <span style={{ fontSize: 11, color: 'var(--muted)', marginRight: 4 }}>Overlays</span>
-          {([
-            { k: 'macd', label: 'MACD' },
-            { k: 'bb',   label: 'BB' },
-            { k: 'goldenCross', label: 'GX' },
-          ] as { k: keyof Indicators; label: string }[]).map(({ k, label }) => (
-            <button key={k} onClick={() => toggleInd(k)} style={{
-              padding: '3px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600,
-              border: `1px solid ${indicators[k] ? 'var(--amber)' : 'var(--border)'}`,
-              background: indicators[k] ? 'var(--amber-bg)' : 'transparent',
-              color: indicators[k] ? 'var(--amber)' : 'var(--muted)', cursor: 'pointer',
-            }}>{label}</button>
-          ))}
-        </div>
+        <OverlayControls indicators={indicators} toggleIndicator={toggleInd} />
       </div>
 
       <p style={{ fontSize: 13, color: 'var(--muted)', margin: 0 }}>
@@ -571,6 +536,19 @@ export default function Signals() {
           ))}
         </div>
       )}
+    </div>
+
+      {/* Sticky quick-score rail — score any stock, not just the tracked watchlist.
+          No overflow/maxHeight here: it would clip the symbol-search dropdown, since
+          an absolutely-positioned descendant is clipped by any scrolling ancestor. */}
+      <aside style={{
+        width: 320,
+        flexShrink: 0,
+        position: 'sticky',
+        top: 0,
+      }}>
+        <QuickScoreWidget />
+      </aside>
     </div>
   )
 }

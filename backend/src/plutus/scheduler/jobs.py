@@ -7,7 +7,6 @@ from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, Literal, cast
 
-import numpy as np
 import pandas as pd
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -108,10 +107,65 @@ def midweek_mini_screen_job(settings: Settings) -> JobResult:
     return JobResult("midweek_mini_screen", "OK")
 
 
+def daily_delivery_fetch_job(
+    session: Session,
+    now: datetime,
+    provider: Any | None = None,
+) -> JobResult:
+    """Fetch today's NSE bhavcopy delivery data, upsert into daily_delivery.
+
+    Filtered to the NSE500 universe (not all ~2000 NSE symbols) to keep the table
+    small — that's the same universe the Sunday pipeline scores. A day with no
+    published bhavcopy (weekend/holiday) is not an error, just nothing to write.
+    """
+    from plutus.data.providers.nse500 import NSE500_SYMBOLS
+    from plutus.data.providers.nse_delivery_provider import NseDeliveryProvider
+    from plutus.db.models import DailyDelivery
+
+    if provider is None:
+        provider = NseDeliveryProvider()
+
+    as_of = now.date()
+    df = provider.fetch_day(as_of)
+    if df.empty:
+        return JobResult(
+            "daily_delivery_fetch", "OK", aborted_reason="no bhavcopy published for this date"
+        )
+
+    universe = set(NSE500_SYMBOLS)
+    df = df[df["symbol"].isin(universe)]
+
+    existing_rows = {
+        row.symbol: row
+        for row in session.execute(
+            select(DailyDelivery).where(DailyDelivery.as_of_date == as_of)
+        ).scalars()
+    }
+    written = 0
+    for row in df.itertuples(index=False):
+        existing = existing_rows.get(row.symbol)
+        if existing:
+            existing.delivery_qty = int(row.delivery_qty)
+            existing.traded_qty = int(row.traded_qty)
+            existing.delivery_pct = float(row.delivery_pct)
+        else:
+            session.add(
+                DailyDelivery(
+                    symbol=row.symbol,
+                    as_of_date=as_of,
+                    delivery_qty=int(row.delivery_qty),
+                    traded_qty=int(row.traded_qty),
+                    delivery_pct=float(row.delivery_pct),
+                )
+            )
+        written += 1
+    session.flush()
+    return JobResult("daily_delivery_fetch", "OK", kept=[f"{written} symbols written"])
+
+
 def sunday_full_run_job(
     universe: list[str],
     ohlcv_chain: OHLCVChain,
-    delivery_provider: Any | None,
     regime_inputs: Any,  # RegimeInputs
     session: Session,
     settings: Settings,
@@ -138,6 +192,11 @@ def sunday_full_run_job(
     from plutus.swing.bundles.vcp import VCPBundle
     from plutus.swing.scoring.classifier import classify
     from plutus.swing.scoring.expectancy import compute_expectancy
+    from plutus.swing.scoring.flow_pillar import flow_score_from_history
+    from plutus.swing.scoring.fundamentals_avoid import (
+        evaluate_fundamentals_avoid,
+        fundamentals_score,
+    )
     from plutus.swing.scoring.pillars import technical_score
 
     run_id = run_id or str(uuid.uuid4())[:8]
@@ -200,7 +259,8 @@ def sunday_full_run_job(
                 candles = candles.reset_index()
                 candles.rename(columns={candles.columns[0]: "date"}, inplace=True)
 
-            delivery_df = _get_delivery(delivery_provider, symbol, start, today, candles)
+            delivery_df = _delivery_df_from_db(symbol, session, today)
+            flow_score = flow_score_from_history(delivery_df)
 
             # v4: compute the new pillars once per symbol (cheap; shared by watch + bundle paths).
             from plutus.swing.scoring.composite_v4 import compute_v4_pillars
@@ -213,6 +273,13 @@ def sunday_full_run_job(
                 rs_engine=rs_blend_engine,
                 settings=settings,
             )
+
+            # Fetch once per symbol — shared by both the watch-screen and bundle scoring
+            # paths below. D/E is a hard veto (dangerously leveraged non-financial
+            # companies); ROCE + valuation contribute a graded 0-10 fundamentals score.
+            fund = fundamentals_provider.fetch(symbol)
+            fund_avoid = evaluate_fundamentals_avoid(fund.de, fund.is_financial, settings)
+            fund_score = fundamentals_score(fund.roce, fund.pe_ttm)
 
             # — Swing path —
             symbol_signals: list[SwingSignal] = []
@@ -227,6 +294,9 @@ def sunday_full_run_job(
                 calibration,
                 settings,
                 v4_pillars=v4_pillars,
+                fundamentals_hard_avoid=fund_avoid.avoid,
+                fundamentals_pts=fund_score,
+                flow_pts=flow_score,
             )
             if ws is not None:
                 symbol_signals.append(ws)
@@ -309,14 +379,16 @@ def sunday_full_run_job(
                         )
                     else:
                         regime_pillar = legacy_regime_pillar(verdict.label)
-                        composite_score = tech.total + exp_pillar + regime_pillar
+                        composite_score = (
+                            tech.total + exp_pillar + regime_pillar + fund_score + flow_score
+                        )
                         breakdown = {
                             "technical": tech.total,
                             "expectancy": exp_pillar,
-                            "flow": 0,
+                            "flow": flow_score,
                             "sentiment": 0,
                             "regime_fit": regime_pillar,
-                            "fundamentals": 0,
+                            "fundamentals": fund_score,
                             "calibration_band": band,
                             "calibration_n": calibration.n_for(sig.bundle, verdict.label),
                         }
@@ -326,6 +398,7 @@ def sunday_full_run_job(
                         expectancy=exp,
                         calibration_band=band,
                         settings=settings,
+                        hard_avoid=fund_avoid.avoid,
                     )
                     if cls_out.label == "AVOID":
                         continue
@@ -508,24 +581,32 @@ class _FallbackCalibration:
         return 0
 
 
-def _get_delivery(
-    provider: Any | None,
-    symbol: str,
-    start: date,
-    end: date,
-    candles: pd.DataFrame,
+def _delivery_df_from_db(
+    symbol: str, session: Session, as_of: date, lookback_days: int = 30
 ) -> pd.DataFrame:
-    if provider is not None:
-        try:
-            return cast(pd.DataFrame, provider.fetch(symbol, start, end))
-        except Exception:
-            pass
-    n = len(candles)
+    """Build the flow pillar's delivery history from daily_delivery_fetch_job's stored
+    data — ascending by date, last row = most recent (what DeliveryTrend treats as
+    "today"). Empty DataFrame if nothing's been fetched yet for this symbol."""
+    from plutus.db.models import DailyDelivery
+
+    rows = (
+        session.execute(
+            select(DailyDelivery)
+            .where(DailyDelivery.symbol == symbol, DailyDelivery.as_of_date <= as_of)
+            .order_by(DailyDelivery.as_of_date.desc())
+            .limit(lookback_days)
+        )
+        .scalars()
+        .all()
+    )
+    if not rows:
+        return pd.DataFrame(columns=["delivery_qty", "traded_qty", "delivery_pct"])
+    rows = sorted(rows, key=lambda r: r.as_of_date)
     return pd.DataFrame(
         {
-            "delivery_qty": np.zeros(n),
-            "traded_qty": np.ones(n),
-            "delivery_pct": np.zeros(n),
+            "delivery_qty": [r.delivery_qty for r in rows],
+            "traded_qty": [r.traded_qty for r in rows],
+            "delivery_pct": [r.delivery_pct for r in rows],
         }
     )
 
@@ -541,6 +622,9 @@ def _make_watch_signal(
     settings: Settings,
     *,
     v4_pillars: Any | None = None,  # composite_v4.V4Pillars | None
+    fundamentals_hard_avoid: bool = False,
+    fundamentals_pts: int = 0,
+    flow_pts: int = 0,
 ) -> Any | None:
     """Light momentum pre-screen → returns an unsaved SwingSignal or None.
 
@@ -644,14 +728,14 @@ def _make_watch_signal(
         )
     else:
         regime_pts = legacy_regime_pillar(regime_label)
-        composite = tech.total + exp_pillar + regime_pts
+        composite = tech.total + exp_pillar + regime_pts + fundamentals_pts + flow_pts
         breakdown = {
             "technical": tech.total,
             "expectancy": exp_pillar,
-            "flow": 0,
+            "flow": flow_pts,
             "sentiment": 0,
             "regime_fit": regime_pts,
-            "fundamentals": 0,
+            "fundamentals": fundamentals_pts,
             "calibration_band": band,
             "calibration_n": 0,
             "watch_criteria": {
@@ -661,7 +745,13 @@ def _make_watch_signal(
             },
         }
 
-    cls_out = classify(score=composite, expectancy=exp, calibration_band=band, settings=settings)
+    cls_out = classify(
+        score=composite,
+        expectancy=exp,
+        calibration_band=band,
+        settings=settings,
+        hard_avoid=fundamentals_hard_avoid,
+    )
     if cls_out.label == "AVOID":
         return None
 

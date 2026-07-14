@@ -33,7 +33,7 @@ export function usePortfolioSnapshot() {
   return useQuery({
     queryKey: ['portfolio-snapshot'],
     queryFn: () => apiClient.get<PortfolioSnapshot>('/shared/portfolio-snapshot').then(r => r.data),
-    refetchInterval: 30_000,
+    refetchInterval: 180_000, // swing trading — backend caches prices for 3min, no need to poll faster
   })
 }
 
@@ -45,7 +45,7 @@ export function useLTP(symbol: string, enabled = true) {
         .then(r => r.data.price)
         .catch(() => null),   // 404 / unavailable → null
     enabled: !!symbol && enabled,
-    staleTime: 30_000,
+    staleTime: 180_000,
     retry: false,
   })
 }
@@ -59,6 +59,24 @@ export function useChart(symbol: string, signalId?: number, days = 90, enabled =
       }).then(r => r.data),
     enabled: !!symbol && enabled,
     staleTime: 5 * 60_000,
+  })
+}
+
+export function useNseSymbols() {
+  return useQuery({
+    queryKey: ['nse-symbols'],
+    queryFn: () => apiClient.get<string[]>('/shared/nse-symbols').then(r => r.data),
+    staleTime: 24 * 60 * 60_000, // full NSE list changes rarely intraday
+  })
+}
+
+export function useQuickScore(symbol: string, enabled = true) {
+  return useQuery({
+    queryKey: ['quick-score', symbol],
+    queryFn: () => apiClient.get<SwingSignal>(`/shared/quick-score/${symbol}`).then(r => r.data),
+    enabled: !!symbol && enabled,
+    retry: false,
+    staleTime: 60_000,
   })
 }
 

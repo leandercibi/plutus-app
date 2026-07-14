@@ -43,3 +43,7 @@ def hourly_price_check_trigger() -> CronTrigger:
         minute=30,
         timezone=_TZ,
     )
+
+
+def daily_delivery_fetch_trigger(hour: int = 19, minute: int = 30) -> CronTrigger:
+    return CronTrigger(day_of_week="mon-fri", hour=hour, minute=minute, timezone=_TZ)

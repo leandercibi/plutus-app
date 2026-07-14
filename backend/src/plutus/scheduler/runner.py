@@ -35,7 +35,6 @@ def _build_sunday_callable(settings: Settings):  # type: ignore[no-untyped-def]
         from plutus.alerts.formatter import AlertFormatter
         from plutus.data.ohlcv import OHLCVChain
         from plutus.data.providers.breadth_provider import BreadthYFinanceProvider
-        from plutus.data.providers.delivery_stub import DeliveryStubProvider
         from plutus.data.providers.fii_dii_provider import FIIDIIStubProvider
         from plutus.data.providers.regime_builder import build_regime_inputs
         from plutus.data.providers.vix_provider import VixYFinanceProvider
@@ -67,7 +66,6 @@ def _build_sunday_callable(settings: Settings):  # type: ignore[no-untyped-def]
         monitor = build_alert_monitor(settings)
         formatter = AlertFormatter()
         ohlcv_chain = OHLCVChain(primary=YFinanceProvider(), fallback=None)
-        delivery = DeliveryStubProvider()
         regime_inputs = build_regime_inputs(
             as_of=now.date(),
             vix_provider=VixYFinanceProvider(),
@@ -82,7 +80,6 @@ def _build_sunday_callable(settings: Settings):  # type: ignore[no-untyped-def]
                 result = sunday_full_run_job(
                     universe=universe,
                     ohlcv_chain=ohlcv_chain,
-                    delivery_provider=delivery,
                     regime_inputs=regime_inputs,
                     session=session,
                     settings=settings,
@@ -432,6 +429,25 @@ def _build_daily_freshness_callable(settings: Settings):  # type: ignore[no-unty
     return _run
 
 
+def _build_daily_delivery_fetch_callable(settings: Settings):  # type: ignore[no-untyped-def]
+    """Fetch NSE's daily bhavcopy delivery report; feeds the swing flow pillar's history."""
+    try:
+        from plutus.scheduler.jobs import daily_delivery_fetch_job
+    except ImportError as exc:
+        logger.warning("Delivery fetch deps unavailable (%s); using log stub", exc)
+        return _log_job("daily_delivery_fetch")
+
+    def _run() -> None:
+        def work(session):  # type: ignore[no-untyped-def]
+            now = datetime.now(tz=UTC).replace(tzinfo=None)
+            result = daily_delivery_fetch_job(session, now)
+            return {"status": result.status, "aborted_reason": result.aborted_reason, "kept": result.kept}
+
+        _run_with_runlog("daily_delivery_fetch", work)
+
+    return _run
+
+
 def _build_midweek_mini_callable(settings: Settings):  # type: ignore[no-untyped-def]
     """B18 — midweek mini-screen (gated by settings.midweek_mini_screen_enabled)."""
     try:
@@ -562,6 +578,13 @@ def build_scheduler(settings: Settings) -> BlockingScheduler:
         _build_hourly_price_check_callable(settings),
         trigger=triggers.hourly_price_check_trigger(),
         id="hourly_price_check",
+    )
+    scheduler.add_job(
+        _build_daily_delivery_fetch_callable(settings),
+        trigger=triggers.daily_delivery_fetch_trigger(
+            settings.daily_delivery_fetch_hour_ist, settings.daily_delivery_fetch_minute_ist
+        ),
+        id="daily_delivery_fetch",
     )
     return scheduler
 

@@ -26,6 +26,7 @@ from plutus.api.schemas.shared import (
     RunLogRowOut,
     RunOut,
 )
+from plutus.api.schemas.swing import SwingSignalOut
 from plutus.config.settings import Settings
 from plutus.data.providers.angelone_provider import USER_RATE_LIMIT_TIMEOUT, RateLimitSaturated
 from plutus.db.models import (
@@ -101,6 +102,127 @@ def get_universe(
         .all()
     )
     return list(rows)
+
+
+@router.get("/nse-symbols", response_model=list[str])
+def get_nse_symbols() -> list[str]:
+    """Full NSE equity symbol list (Angel One script master) for symbol pickers."""
+    from plutus.data.providers.angelone_provider import list_nse_symbols
+
+    return list_nse_symbols()
+
+
+@router.get("/quick-score/{symbol}", response_model=SwingSignalOut)
+def get_quick_score(
+    symbol: str,
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_app_settings),
+) -> SwingSignalOut:
+    """On-demand swing score for any symbol, via the same watch-screen scoring path
+    (technical + expectancy + regime pillars) the Sunday pipeline uses — not persisted
+    to the signals table. Uses the latest cached regime rather than recomputing
+    market-wide breadth/VIX/FII live.
+    """
+    from datetime import datetime, timedelta
+
+    from plutus.data.providers.fundamentals_provider import FundamentalsProvider
+    from plutus.data.providers.yfinance_provider import YFinanceProvider
+    from plutus.scheduler.jobs import _delivery_df_from_db, _FallbackCalibration, _make_watch_signal
+    from plutus.shared.cost_model.costs import CostModel
+    from plutus.swing.scoring.flow_pillar import flow_score_from_history
+    from plutus.swing.scoring.fundamentals_avoid import (
+        evaluate_fundamentals_avoid,
+        fundamentals_score,
+    )
+
+    symbol = symbol.strip().upper()
+
+    latest_regime = (
+        db.execute(select(RegimeSnapshot).order_by(RegimeSnapshot.as_of_date.desc()).limit(1))
+        .scalars()
+        .first()
+    )
+    regime_label = latest_regime.label if latest_regime else "SIDEWAYS"
+
+    end = date.today()
+    start = end - timedelta(days=365)
+    df = None
+    if all(
+        [
+            settings.angel_api_key,
+            settings.angel_client_id,
+            settings.angel_password,
+            settings.angel_totp_secret,
+        ]
+    ):
+        try:
+            from plutus.data.providers.angelone_provider import AngelOneProvider
+
+            angel = AngelOneProvider(
+                api_key=settings.angel_api_key,
+                client_id=settings.angel_client_id,
+                password=settings.angel_password,
+                totp_secret=settings.angel_totp_secret,
+                rate_limit_timeout=USER_RATE_LIMIT_TIMEOUT,
+            )
+            df = angel.fetch(symbol, start, end)
+        except RateLimitSaturated:
+            df = None
+        except Exception:
+            df = None
+    if df is None or df.empty:
+        try:
+            df = YFinanceProvider().fetch(symbol, start, end)
+        except Exception as exc:
+            raise HTTPException(status_code=404, detail=f"No price data for {symbol}") from exc
+    if df is None or df.empty or len(df) < 21:
+        raise HTTPException(status_code=404, detail=f"Not enough price history for {symbol}")
+
+    fund = FundamentalsProvider().fetch(symbol)
+    fund_avoid = evaluate_fundamentals_avoid(fund.de, fund.is_financial, settings)
+    fund_score = fundamentals_score(fund.roce, fund.pe_ttm)
+    flow_score = flow_score_from_history(_delivery_df_from_db(symbol, db, date.today()))
+
+    signal = _make_watch_signal(
+        symbol,
+        df,
+        regime_label,
+        "quick-score",
+        datetime.utcnow(),
+        CostModel(settings),
+        _FallbackCalibration(),
+        settings,
+        fundamentals_hard_avoid=fund_avoid.avoid,
+        fundamentals_pts=fund_score,
+        flow_pts=flow_score,
+    )
+    if signal is None:
+        detail = (
+            f"AVOID — {fund_avoid.reason}"
+            if fund_avoid.avoid
+            else f"No actionable setup for {symbol} under current momentum criteria"
+        )
+        raise HTTPException(status_code=422, detail=detail)
+
+    return SwingSignalOut(
+        id=0,
+        run_id=signal.run_id,
+        symbol=signal.symbol,
+        bundle=signal.bundle,
+        score=signal.score,
+        label=signal.label,
+        entry=signal.entry,
+        stop_loss=signal.stop_loss,
+        target_1=signal.target_1,
+        target_2=signal.target_2,
+        expectancy_R=signal.expectancy_R,
+        drawn_rr=signal.drawn_rr,
+        regime_at_signal=signal.regime_at_signal,
+        pillar_breakdown=signal.pillar_breakdown_json,
+        counterfactual=signal.counterfactual_text,
+        calibration_band=signal.pillar_breakdown_json.get("calibration_band", "low"),
+        created_at=signal.created_at,
+    )
 
 
 @router.get("/calibration", response_model=list[CalibrationRowOut])
@@ -484,12 +606,20 @@ def run_backtest(payload: BacktestRequestIn) -> BacktestResultOut:
     )
 
 
+PRICE_CACHE_TTL_SECONDS = 180
+
+
 def _fetch_live_prices(
     symbols: set[str],
     settings: Settings,
     db: Session,
 ) -> dict[str, float]:
-    """Fetch LTP via Angel One → yfinance → cached LatestPrice table (stale fallback)."""
+    """Fetch LTP via cached (<3min) price → Angel One → yfinance → stale cache fallback.
+
+    Swing trading doesn't need sub-3min price freshness, and Angel One is rate-limited,
+    so a symbol whose LatestPrice row is younger than PRICE_CACHE_TTL_SECONDS is served
+    from cache instead of hitting a live provider.
+    """
     import logging
     from datetime import datetime, timedelta
     from decimal import Decimal as D
@@ -498,7 +628,24 @@ def _fetch_live_prices(
     prices: dict[str, float] = {}
     source = "angelone"
 
-    if settings.angel_api_key and settings.angel_client_id:
+    now = datetime.utcnow()
+    cache_cutoff = now - timedelta(seconds=PRICE_CACHE_TTL_SECONDS)
+    fresh_rows = (
+        db.execute(
+            select(LatestPrice).where(
+                LatestPrice.symbol.in_(symbols), LatestPrice.fetched_at >= cache_cutoff
+            )
+        )
+        .scalars()
+        .all()
+    )
+    for row in fresh_rows:
+        prices[row.symbol] = float(row.price)
+
+    to_fetch = symbols - prices.keys()
+    angelone_hit = False
+
+    if to_fetch and settings.angel_api_key and settings.angel_client_id:
         try:
             from plutus.data.providers.angelone_provider import AngelOneProvider
 
@@ -509,31 +656,34 @@ def _fetch_live_prices(
                 totp_secret=settings.angel_totp_secret,
                 rate_limit_timeout=USER_RATE_LIMIT_TIMEOUT,
             )
-            prices = provider.fetch_ltp_batch(list(symbols))
+            fetched = provider.fetch_ltp_batch(list(to_fetch))
+            prices.update(fetched)
+            to_fetch -= fetched.keys()
+            angelone_hit = bool(fetched)
         except RateLimitSaturated:
             logger.warning("angel_one_batch_rate_saturated — falling back to yfinance")
         except Exception:
             logger.warning("angel_one_batch_failed, falling back to yfinance", exc_info=True)
 
-    missing = symbols - prices.keys()
-    if missing:
-        source = "yfinance" if not prices else source
+    if to_fetch:
+        source = "yfinance" if not angelone_hit else source
         from plutus.data.providers.yfinance_provider import YFinanceProvider
 
         yf_provider = YFinanceProvider()
         today = date.today()
         start = today - timedelta(days=5)
-        for sym in missing:
+        for sym in list(to_fetch):
             try:
                 df = yf_provider.fetch(sym, start, today)
                 if not df.empty:
                     prices[sym] = float(df["close"].iloc[-1])
+                    to_fetch.discard(sym)
             except Exception:
                 logger.warning("yfinance_fallback_failed: %s", sym)
 
     # Last resort: read stale cached prices from the LatestPrice table so that
     # the portfolio snapshot is never silently empty when live sources are down.
-    still_missing = symbols - prices.keys()
+    still_missing = to_fetch
     if still_missing:
         cached_rows = (
             db.execute(select(LatestPrice).where(LatestPrice.symbol.in_(still_missing)))
@@ -549,26 +699,24 @@ def _fetch_live_prices(
                 row.fetched_at,
             )
 
-    now = datetime.utcnow()
-    for sym, price in prices.items():
-        # Only write back to cache if the price came from a live source
-        if sym not in still_missing:
-            existing = (
-                db.execute(select(LatestPrice).where(LatestPrice.symbol == sym)).scalars().first()
-            )
-            if existing:
-                existing.price = D(str(round(price, 2)))
-                existing.source = source
-                existing.fetched_at = now
-            else:
-                db.add(
-                    LatestPrice(
-                        symbol=sym,
-                        price=D(str(round(price, 2))),
-                        source=source,
-                        fetched_at=now,
-                    )
+    freshly_cached_symbols = {row.symbol for row in fresh_rows}
+    live_symbols = symbols - freshly_cached_symbols - still_missing
+    for sym in live_symbols:
+        price = prices[sym]
+        existing = db.execute(select(LatestPrice).where(LatestPrice.symbol == sym)).scalars().first()
+        if existing:
+            existing.price = D(str(round(price, 2)))
+            existing.source = source
+            existing.fetched_at = now
+        else:
+            db.add(
+                LatestPrice(
+                    symbol=sym,
+                    price=D(str(round(price, 2))),
+                    source=source,
+                    fetched_at=now,
                 )
+            )
     db.flush()
     return prices
 

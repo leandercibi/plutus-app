@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
-import { useSignals, useCandidates, useCalibration, useRunBacktest } from '../api/hooks'
+import { useSignals, useCandidates, useCalibration, useRunBacktest, useNseSymbols } from '../api/hooks'
+import { searchSymbols } from '../utils/symbolSearch'
 
 const BACKTEST_BUNDLES = ['trend', 'breakout', 'reversal', 'vcp', 'composite'] as const
 
@@ -38,17 +39,19 @@ export default function StrategyLab() {
   const candidates = useCandidates()
   const calibration = useCalibration()
   const backtest    = useRunBacktest()
+  const nseSymbols  = useNseSymbols()
 
-  // Build searchable symbol list
+  // Build searchable symbol list — full NSE universe, not just tracked signals/candidates
   const symbolList = useMemo(() => {
     const set = new Set<string>()
+    nseSymbols.data?.forEach(s => { if (!s.includes('NSETEST')) set.add(s) })
     signals.data?.forEach(s => set.add(s.symbol))
     candidates.data?.forEach(c => set.add(c.symbol))
     return [...set].sort()
-  }, [signals.data, candidates.data])
+  }, [nseSymbols.data, signals.data, candidates.data])
 
   const filtered = useMemo(() =>
-    query.length < 1 ? symbolList : symbolList.filter(s => s.includes(query.toUpperCase())),
+    query.length < 1 ? symbolList : searchSymbols(symbolList, query, 50),
     [symbolList, query]
   )
 

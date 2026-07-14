@@ -21,8 +21,8 @@ export interface PositionSnapshot {
   current_price: number
   pnl: number
   pnl_pct: number
-  stop_loss: number
-  sl_distance_pct: number
+  stop_loss: number | null
+  sl_distance_pct: number | null
 }
 
 export interface PortfolioSnapshot {
