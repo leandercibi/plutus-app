@@ -42,8 +42,6 @@ def test_score_increases_monotonically_with_delivery_above_median() -> None:
     scores: list[int] = []
     for today in (0.41, 0.46, 0.52, 0.60, 0.70):
         frame = _frame_with_today(today)
-        scores.append(
-            DeliveryTrend().compute(frame, today_idx=len(frame) - 1).score_0_15
-        )
+        scores.append(DeliveryTrend().compute(frame, today_idx=len(frame) - 1).score_0_15)
     assert scores == sorted(scores)
     assert scores[-1] > scores[0]

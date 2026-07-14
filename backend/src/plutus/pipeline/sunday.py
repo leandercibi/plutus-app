@@ -5,7 +5,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from decimal import Decimal
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 import pandas as pd
 from sqlalchemy.orm import Session
@@ -15,6 +15,7 @@ from plutus.alerts.factory import build_alert_monitor
 from plutus.config.settings import Settings, get_settings
 from plutus.data.freshness import assert_freshness
 from plutus.data.ohlcv import OHLCVChain
+from plutus.data.providers.fundamentals_provider import FundamentalsProvider
 from plutus.data.providers.market_data import (
     compute_advance_decline,
     compute_breadth_from_candles,
@@ -36,6 +37,8 @@ from plutus.swing.bundles.trend import TrendBundle
 from plutus.swing.bundles.vcp import VCPBundle
 from plutus.swing.scoring.classifier import classify
 from plutus.swing.scoring.expectancy import compute_expectancy
+from plutus.swing.scoring.flow_pillar import flow_score_from_history
+from plutus.swing.scoring.fundamentals_avoid import evaluate_fundamentals_avoid, fundamentals_score
 from plutus.swing.scoring.pillars import technical_score
 from plutus.swing.scoring.selector import BundleRegimeStat, SelectorInputs
 
@@ -177,6 +180,10 @@ def _score_and_classify(
     calibration: CalibrationLookup,
     cost_model: CostModel,
     cfg: Settings,
+    *,
+    fundamentals_hard_avoid: bool = False,
+    fundamentals_pts: int = 0,
+    flow_pts: int = 0,
 ) -> dict[str, Any] | None:
     from plutus.shared.types import BundleSignal
 
@@ -200,16 +207,25 @@ def _score_and_classify(
     pillar_bd = {
         "technical": tech.total,
         "expectancy": exp_score,
-        "flow": 8,
-        "sentiment": 3,
+        # sentiment: not computed — no scorer wired in. 0 means "not computed,"
+        # never a fabricated number.
+        "flow": flow_pts,
+        "sentiment": 0,
         "regime_fit": regime_score,
-        "fundamentals": 6,
+        "fundamentals": fundamentals_pts,
         "calibration_n": calibration.n_for(sig.bundle, regime),
         "calibration_band": calibration.confidence_band(sig.bundle, regime, ""),
     }
     score_keys = ("technical", "expectancy", "flow", "sentiment", "regime_fit", "fundamentals")
     total_score = sum(cast(int, pillar_bd[k]) for k in score_keys)
-    clf = classify(total_score, exp_result, pillar_bd["calibration_band"], cfg)  # type: ignore[arg-type]
+    calibration_band = cast(Literal["low", "medium", "high"], pillar_bd["calibration_band"])
+    clf = classify(
+        total_score,
+        exp_result,
+        calibration_band,
+        cfg,
+        hard_avoid=fundamentals_hard_avoid,
+    )
     return {
         "signal": sig,
         "score": total_score,
@@ -322,8 +338,17 @@ def _execute_sunday_pipeline(
     bundles = [TrendBundle(cfg), BreakoutBundle(cfg), ReversalBundle(cfg), VCPBundle(cfg)]
     calibration: CalibrationLookup = _FallbackCalibration()  # type: ignore[assignment]
     cost_model = CostModel(cfg)
+    fundamentals_provider = FundamentalsProvider()
     errors: list[str] = []
     results = []
+
+    from plutus.swing.scoring.watch_signal import _delivery_df_from_db
+
+    with session_scope() as read_session:
+        delivery_by_symbol = {
+            sym: flow_score_from_history(_delivery_df_from_db(sym, read_session, as_of))
+            for sym in all_candles
+        }
 
     for sym, candles in all_candles.items():
         try:
@@ -332,10 +357,22 @@ def _execute_sunday_pipeline(
             if not sub_signals:
                 continue
             best = sub_signals[0]
+            fund = fundamentals_provider.fetch(sym)
+            fund_avoid = evaluate_fundamentals_avoid(fund.de, fund.is_financial, cfg)
+            fund_score = fundamentals_score(fund.roce, fund.pe_ttm)
             scored = _score_and_classify(
-                sym, candles, best, regime_label, calibration, cost_model, cfg
+                sym,
+                candles,
+                best,
+                regime_label,
+                calibration,
+                cost_model,
+                cfg,
+                fundamentals_hard_avoid=fund_avoid.avoid,
+                fundamentals_pts=fund_score,
+                flow_pts=delivery_by_symbol.get(sym, 0),
             )
-            if scored:
+            if scored and scored["label"] != "AVOID":
                 results.append(scored)
         except Exception as exc:
             errors.append(f"{sym}: {exc}")

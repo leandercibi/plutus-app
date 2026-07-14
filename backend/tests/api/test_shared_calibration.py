@@ -3,9 +3,7 @@ from __future__ import annotations
 from fastapi.testclient import TestClient
 
 
-def test_calibration_returns_ci_fields(
-    client: TestClient, auth_headers: dict[str, str]
-) -> None:
+def test_calibration_returns_ci_fields(client: TestClient, auth_headers: dict[str, str]) -> None:
     resp = client.get("/shared/calibration/trend_70_75/BULL", headers=auth_headers)
     assert resp.status_code == 200
     body = resp.json()
@@ -17,8 +15,6 @@ def test_calibration_returns_ci_fields(
     assert body["sprt_state"] == "continue"
 
 
-def test_calibration_missing_returns_404(
-    client: TestClient, auth_headers: dict[str, str]
-) -> None:
+def test_calibration_missing_returns_404(client: TestClient, auth_headers: dict[str, str]) -> None:
     resp = client.get("/shared/calibration/nope/BULL", headers=auth_headers)
     assert resp.status_code == 404

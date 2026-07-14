@@ -31,9 +31,7 @@ def test_unknown_symbol_returns_empty_list_not_error() -> None:
 def test_is_earnings_in_window_true_when_date_inside() -> None:
     provider = _StubEarnings({"INFY": [date(2025, 1, 20)]})
     assert (
-        is_earnings_in_window(
-            "INFY", date(2025, 1, 1), date(2025, 1, 31), provider=provider
-        )
+        is_earnings_in_window("INFY", date(2025, 1, 1), date(2025, 1, 31), provider=provider)
         is True
     )
 
@@ -41,9 +39,7 @@ def test_is_earnings_in_window_true_when_date_inside() -> None:
 def test_is_earnings_in_window_false_when_outside() -> None:
     provider = _StubEarnings({"INFY": [date(2025, 2, 20)]})
     assert (
-        is_earnings_in_window(
-            "INFY", date(2025, 1, 1), date(2025, 1, 31), provider=provider
-        )
+        is_earnings_in_window("INFY", date(2025, 1, 1), date(2025, 1, 31), provider=provider)
         is False
     )
 
@@ -51,9 +47,7 @@ def test_is_earnings_in_window_false_when_outside() -> None:
 def test_is_earnings_in_window_inclusive_bounds() -> None:
     provider = _StubEarnings({"INFY": [date(2025, 1, 31)]})
     assert (
-        is_earnings_in_window(
-            "INFY", date(2025, 1, 1), date(2025, 1, 31), provider=provider
-        )
+        is_earnings_in_window("INFY", date(2025, 1, 1), date(2025, 1, 31), provider=provider)
         is True
     )
 
@@ -61,8 +55,6 @@ def test_is_earnings_in_window_inclusive_bounds() -> None:
 def test_unknown_symbol_window_is_false() -> None:
     provider = _StubEarnings({})
     assert (
-        is_earnings_in_window(
-            "UNKNOWN", date(2025, 1, 1), date(2025, 1, 31), provider=provider
-        )
+        is_earnings_in_window("UNKNOWN", date(2025, 1, 1), date(2025, 1, 31), provider=provider)
         is False
     )

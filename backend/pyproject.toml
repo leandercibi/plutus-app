@@ -36,6 +36,7 @@ dev = [
     "responses>=0.25",
     "pandas-stubs",
     "httpx2>=2.5",
+    "pre-commit>=3.7",
 ]
 
 [build-system]

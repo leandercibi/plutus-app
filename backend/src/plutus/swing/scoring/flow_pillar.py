@@ -17,7 +17,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from plutus.shared.smart_money.delivery import DeliveryTrendScore
+import pandas as pd
+
+from plutus.shared.smart_money.delivery import DeliveryTrend, DeliveryTrendScore
 from plutus.shared.smart_money.per_stock_score import FlowScore
 
 
@@ -51,3 +53,17 @@ def flow_pillar_from_full(flow: FlowScore, *, max_points: int = 15) -> FlowPilla
     """
     score = max(0, min(max_points, int(flow.total_0_15)))
     return FlowPillar(score=score, components=dict(flow.components), source="full_flow")
+
+
+def flow_score_from_history(delivery_df: pd.DataFrame | None) -> int:
+    """0-15 flow score straight from a delivery-% history DataFrame (ascending by
+    date, last row = most recent). 0 if there's not enough history yet — e.g. the
+    daily delivery fetch job hasn't accumulated data for this symbol yet.
+
+    Convenience entry point for callers that only care about the delivery-only
+    flow score (not the full v4 pillar bundle) — the legacy composite paths.
+    """
+    if delivery_df is None or len(delivery_df) < 2:
+        return 0
+    trend = DeliveryTrend().compute(delivery_df, len(delivery_df) - 1)
+    return flow_pillar(trend).score

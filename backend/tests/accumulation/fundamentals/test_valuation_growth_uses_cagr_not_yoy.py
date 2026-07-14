@@ -21,13 +21,9 @@ def test_growth_score_uses_cagr_not_yoy() -> None:
     valuation = Valuation()
 
     # base-effect: ~flat then a recovery year +120% YoY (10 -> 22)
-    base_effect = _history(
-        [(2020, 10.0), (2021, 9.0), (2022, 9.5), (2023, 10.0), (2024, 22.0)]
-    )
+    base_effect = _history([(2020, 10.0), (2021, 9.0), (2022, 9.5), (2023, 10.0), (2024, 22.0)])
     # steady compounder: clean 3y/5y CAGR, no single spike
-    steady = _history(
-        [(2020, 10.0), (2021, 13.0), (2022, 17.0), (2023, 22.0), (2024, 29.0)]
-    )
+    steady = _history([(2020, 10.0), (2021, 13.0), (2022, 17.0), (2023, 22.0), (2024, 29.0)])
 
     spike_yoy = (22.0 - 10.0) / 10.0
     assert spike_yoy == pytest.approx(1.2)  # +120% latest YoY

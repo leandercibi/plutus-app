@@ -35,8 +35,5 @@ def test_complete_subclass_constructs() -> None:
             return {"ohlcv"}
 
     b = Complete()
-    assert (
-        b.fit_signal("X", pd.DataFrame(), BundleContext(symbol="X", regime="BULL"))
-        is None
-    )
+    assert b.fit_signal("X", pd.DataFrame(), BundleContext(symbol="X", regime="BULL")) is None
     assert b.required_inputs() == {"ohlcv"}

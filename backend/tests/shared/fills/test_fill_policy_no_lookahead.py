@@ -19,9 +19,7 @@ _policy = FillPolicy(SlippageModel(Settings(_env_file=None)))
     days_ahead=st.integers(min_value=1, max_value=30),
     open_=st.decimals(min_value=Decimal("50"), max_value=Decimal("500"), places=2),
 )
-def test_entry_fill_is_strictly_after_signal_bar(
-    days_ahead: int, open_: Decimal
-) -> None:
+def test_entry_fill_is_strictly_after_signal_bar(days_ahead: int, open_: Decimal) -> None:
     signal_day = date(2025, 1, 1)
     next_bar = OHLCBar(
         as_of=signal_day + timedelta(days=days_ahead),

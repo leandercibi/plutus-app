@@ -12,6 +12,7 @@ Covers:
 
 from __future__ import annotations
 
+import contextlib
 import threading
 import time
 
@@ -19,24 +20,22 @@ import pytest
 
 import plutus.data.providers.angelone_provider as _mod
 from plutus.data.providers.angelone_provider import (
-    RateLimitSaturated,
-    USER_RATE_LIMIT_TIMEOUT,
     _MIN_INTERVAL,
+    USER_RATE_LIMIT_TIMEOUT,
+    RateLimitSaturated,
     _rate_wait,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _reset_rate_state() -> None:
     """Reset module-level rate-limiter state between tests."""
     # Release the lock if somehow held (shouldn't happen, but defensive)
-    try:
+    with contextlib.suppress(RuntimeError):
         _mod._RATE_LOCK.release()
-    except RuntimeError:
-        pass
     _mod._LAST_CALL[0] = 0.0
 
 
@@ -52,6 +51,7 @@ def reset_rate(monkeypatch):
 # Interval enforcement
 # ---------------------------------------------------------------------------
 
+
 def test_two_consecutive_calls_respect_min_interval():
     t0 = time.monotonic()
     _rate_wait()
@@ -62,21 +62,27 @@ def test_two_consecutive_calls_respect_min_interval():
     )
 
 
-def test_calls_far_apart_do_not_add_artificial_delay():
-    _rate_wait()
-    time.sleep(_MIN_INTERVAL + 0.05)  # already past the interval
-    t0 = time.monotonic()
-    _rate_wait()
-    elapsed = time.monotonic() - t0
-    # Should complete almost immediately — no extra sleep needed
-    assert elapsed < _MIN_INTERVAL, (
-        f"Unexpected extra delay: {elapsed:.3f}s (threshold {_MIN_INTERVAL}s)"
-    )
+def test_calls_far_apart_do_not_add_artificial_delay(monkeypatch):
+    """When enough real time has already passed, _rate_wait must not add an
+    artificial extra sleep. Simulates the elapsed time by rewinding _LAST_CALL
+    instead of a real time.sleep(): a real wall-clock measurement here was
+    intermittently flaky under system load (OS scheduling jitter routinely
+    blew past the tight assertion threshold when the full suite was running)."""
+    sleep_calls: list[float] = []
+    monkeypatch.setattr(_mod.time, "sleep", lambda s: sleep_calls.append(s))
+
+    _rate_wait()  # first call — sets _LAST_CALL
+    _mod._LAST_CALL[0] -= _MIN_INTERVAL + 0.05  # simulate time already elapsed
+
+    _rate_wait()  # second call — should see it's already past the interval
+
+    assert sleep_calls == [], f"Unexpected artificial delay: slept for {sleep_calls}"
 
 
 # ---------------------------------------------------------------------------
 # Timeout=None: blocks indefinitely
 # ---------------------------------------------------------------------------
+
 
 def test_background_caller_blocks_until_lock_released():
     """A timeout=None caller must wait for a held lock and then succeed."""
@@ -86,7 +92,7 @@ def test_background_caller_blocks_until_lock_released():
 
     def background_call():
         try:
-            _rate_wait(timeout=None)   # should block
+            _rate_wait(timeout=None)  # should block
             results.append("ok")
         except RateLimitSaturated:
             results.append("saturated")
@@ -98,7 +104,11 @@ def test_background_caller_blocks_until_lock_released():
     assert results == [], "Should still be blocked"
 
     _mod._RATE_LOCK.release()  # unblock it
-    t.join(timeout=2.0)
+    t.join(timeout=10.0)
+    # A thread still alive here would keep running after this test returns and could
+    # release/acquire the shared module-level lock mid-way through a later test —
+    # fail loudly now instead of leaking a zombie thread that corrupts other tests.
+    assert not t.is_alive(), "Background thread did not finish within the join timeout"
 
     assert results == ["ok"], "Background caller should have succeeded after lock released"
 
@@ -106,6 +116,7 @@ def test_background_caller_blocks_until_lock_released():
 # ---------------------------------------------------------------------------
 # Timeout=float: fails fast
 # ---------------------------------------------------------------------------
+
 
 def test_user_caller_raises_when_lock_held():
     """A user-facing caller with a short timeout must raise RateLimitSaturated."""
@@ -121,10 +132,8 @@ def test_lock_released_after_rate_limit_saturated():
     """After RateLimitSaturated the lock must not be held — next call succeeds."""
     _mod._RATE_LOCK.acquire()
 
-    try:
+    with contextlib.suppress(RateLimitSaturated):
         _rate_wait(timeout=0.05)
-    except RateLimitSaturated:
-        pass
 
     _mod._RATE_LOCK.release()  # release what we acquired above
 
@@ -152,6 +161,7 @@ def test_user_timeout_value_is_respected():
 # ---------------------------------------------------------------------------
 # Concurrent scenario: cron sweeping + user refresh
 # ---------------------------------------------------------------------------
+
 
 def test_concurrent_background_and_user_calls():
     """Simulates a cron sweep holding the lock while a user refresh arrives.
@@ -186,11 +196,16 @@ def test_concurrent_background_and_user_calls():
     usr.start()
 
     time.sleep(0.1)  # user call should have timed out by now
+    usr.join(timeout=10.0)
+    assert not usr.is_alive(), "User-facing thread did not finish within the join timeout"
     assert user_result == ["saturated"], "User-facing call should have given up quickly"
     assert background_result == [], "Background call should still be waiting"
 
     _mod._RATE_LOCK.release()
-    bg.join(timeout=2.0)
+    bg.join(timeout=10.0)
+    # Same reasoning as test_background_caller_blocks_until_lock_released: don't let
+    # a slow-under-load thread outlive this test and corrupt a later one's lock state.
+    assert not bg.is_alive(), "Background thread did not finish within the join timeout"
 
     assert background_result == ["ok"], "Background call should succeed once lock freed"
 
@@ -198,6 +213,7 @@ def test_concurrent_background_and_user_calls():
 # ---------------------------------------------------------------------------
 # AngelOneProvider construction wires the timeout correctly
 # ---------------------------------------------------------------------------
+
 
 def test_provider_default_timeout_is_none(monkeypatch):
     """AngelOneProvider() with no rate_limit_timeout passes None to _rate_wait."""

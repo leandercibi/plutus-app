@@ -5,9 +5,7 @@ from pathlib import Path
 
 import pytest
 
-_PILLARS_SRC = (
-    Path(__file__).parents[3] / "src" / "plutus" / "swing" / "scoring" / "pillars.py"
-)
+_PILLARS_SRC = Path(__file__).parents[3] / "src" / "plutus" / "swing" / "scoring" / "pillars.py"
 
 
 def _imported_names(path: Path) -> str:

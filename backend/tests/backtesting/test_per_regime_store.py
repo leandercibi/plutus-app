@@ -9,9 +9,7 @@ from plutus.db.models import BundleStatPerRegime
 from plutus.shared.types import BundleStats
 
 
-def _stats(
-    bundle: str = "trend", regime: str = "BULL", exp: float = 0.4
-) -> BundleStats:
+def _stats(bundle: str = "trend", regime: str = "BULL", exp: float = 0.4) -> BundleStats:
     return BundleStats(
         bundle=bundle,
         regime=regime,

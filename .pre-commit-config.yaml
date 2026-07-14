@@ -1,0 +1,65 @@
+# Mirrors the CI gates in .github/workflows/ci.yml so nothing red reaches GitHub.
+#
+# One-time setup (from repo root):
+#   pip install -e "backend[dev]"
+#   pre-commit install -t pre-commit -t pre-push
+#
+# Local hooks below call .venv/bin/<tool> directly (not bare `mypy`/`pytest`)
+# because git hooks run in a clean shell without the venv activated — relying
+# on PATH silently picks up whatever stray Python/tool is installed system-wide.
+#
+# Fast checks (ruff format/lint, eslint) run on every `git commit`.
+# Slower checks that mirror CI exactly (mypy, import-linter, pytest, frontend
+# build) run on `git push` instead, so commits stay quick but nothing broken
+# gets pushed.
+
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.16
+    hooks:
+      - id: ruff-format
+        files: ^backend/
+      - id: ruff
+        files: ^backend/
+        args: [--fix]
+
+  - repo: local
+    hooks:
+      - id: eslint
+        name: eslint (frontend)
+        entry: bash -c 'cd frontend && npm run lint'
+        language: system
+        files: ^frontend/.*\.(ts|tsx)$
+        pass_filenames: false
+
+      - id: mypy
+        name: mypy (backend)
+        entry: bash -c 'cd backend && ../.venv/bin/mypy src'
+        language: system
+        files: ^backend/.*\.py$
+        pass_filenames: false
+        stages: [pre-push]
+
+      - id: import-linter
+        name: import-linter (backend)
+        entry: bash -c 'cd backend && ../.venv/bin/lint-imports --config importlinter.ini'
+        language: system
+        files: ^backend/.*\.py$
+        pass_filenames: false
+        stages: [pre-push]
+
+      - id: pytest
+        name: pytest (backend)
+        entry: bash -c 'cd backend && ../.venv/bin/pytest -m "not slow"'
+        language: system
+        files: ^backend/.*\.py$
+        pass_filenames: false
+        stages: [pre-push]
+
+      - id: frontend-build
+        name: type-check & build (frontend)
+        entry: bash -c 'cd frontend && npm run build'
+        language: system
+        files: ^frontend/
+        pass_filenames: false
+        stages: [pre-push]

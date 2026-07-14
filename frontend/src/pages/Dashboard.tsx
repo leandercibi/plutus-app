@@ -169,7 +169,9 @@ export default function Dashboard() {
                   <td style={{ padding: '9px 16px', color: 'var(--muted)' }}>{pos.qty}</td>
                   <td style={{ padding: '9px 16px' }}>₹{pos.avg_cost.toLocaleString('en-IN')}</td>
                   <td style={{ padding: '9px 16px' }}>₹{pos.current_price.toLocaleString('en-IN')}</td>
-                  <td style={{ padding: '9px 16px', color: 'var(--red)' }}>₹{pos.stop_loss.toLocaleString('en-IN')}</td>
+                  <td style={{ padding: '9px 16px', color: 'var(--red)' }}>
+                    {pos.stop_loss != null ? `₹${pos.stop_loss.toLocaleString('en-IN')}` : '—'}
+                  </td>
                   <td style={{ padding: '9px 16px', color: pos.pnl >= 0 ? 'var(--green)' : 'var(--red)' }}>
                     {pos.pnl >= 0 ? '+' : ''}₹{pos.pnl.toLocaleString('en-IN')}
                   </td>

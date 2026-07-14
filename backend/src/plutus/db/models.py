@@ -305,6 +305,28 @@ class LatestPrice(Base):
     fetched_at: Mapped[datetime]
 
 
+class DailyDelivery(Base):
+    """NSE bhavcopy delivery position, one row per (symbol, trading day).
+
+    Fetched daily (see nse_delivery_provider.py + scheduler daily_delivery_fetch job);
+    the swing flow pillar reads the last ~20-30 rows per symbol to build a delivery
+    trend, so this accumulates a rolling history rather than being fetched fresh
+    on every pipeline run.
+    """
+
+    __tablename__ = "daily_delivery"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    symbol: Mapped[str] = mapped_column(String(32), index=True)
+    as_of_date: Mapped[date] = mapped_column(index=True)
+    delivery_qty: Mapped[int]
+    traded_qty: Mapped[int]
+    delivery_pct: Mapped[float]
+
+    __table_args__ = (
+        UniqueConstraint("symbol", "as_of_date", name="uq_daily_delivery_symbol_date"),
+    )
+
+
 class DrawdownGovernorState(Base):
     """B4. Single-row upserted state for the 3-day recovery rule."""
 

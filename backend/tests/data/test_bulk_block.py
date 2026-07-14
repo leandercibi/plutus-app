@@ -54,9 +54,7 @@ def test_date_filtering() -> None:
 
 
 def test_unknown_symbol_returns_empty() -> None:
-    events = fetch_bulk_block(
-        "UNKNOWN", date(2025, 1, 1), date(2025, 1, 31), _provider()
-    )
+    events = fetch_bulk_block("UNKNOWN", date(2025, 1, 1), date(2025, 1, 31), _provider())
     assert events == []
 
 

@@ -9,9 +9,7 @@ import pytest
 from plutus.config.settings import Settings
 from plutus.shared.cost_model.costs import CostModel
 
-_GRID = json.loads(
-    (Path(__file__).parents[2] / "fixtures" / "cost_grid.json").read_text()
-)
+_GRID = json.loads((Path(__file__).parents[2] / "fixtures" / "cost_grid.json").read_text())
 
 
 @pytest.fixture

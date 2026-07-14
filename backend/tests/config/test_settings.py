@@ -15,9 +15,7 @@ def test_defaults_load() -> None:
     assert s.expectancy_floor_R == 0.3
 
 
-def test_env_file_overrides_defaults(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_env_file_overrides_defaults(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     env = tmp_path / ".env"
     env.write_text("RISK_PER_TRADE_PCT=0.005\n")
     s = Settings(_env_file=str(env))

@@ -31,12 +31,7 @@ def test_pit_round_trip_three_dates(session: Session) -> None:
     for d in (date(2025, 1, 1), date(2025, 2, 1), date(2025, 3, 1)):
         session.add(_row("TCS", d))
     session.commit()
-    rows = (
-        session.query(Universe)
-        .filter_by(symbol="TCS")
-        .order_by(Universe.as_of_date)
-        .all()
-    )
+    rows = session.query(Universe).filter_by(symbol="TCS").order_by(Universe.as_of_date).all()
     assert [r.as_of_date for r in rows] == [
         date(2025, 1, 1),
         date(2025, 2, 1),

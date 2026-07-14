@@ -97,6 +97,12 @@ class Settings(BaseSettings):
     accumulation_de_max: float = 1.5
     accumulation_n_tranches: int = 5
 
+    # --- swing fundamentals avoid-filter ---
+    # Swing holds are too short (~days-weeks) for quality/growth/valuation scoring to be
+    # meaningful, so fundamentals only veto trades on dangerously leveraged non-financial
+    # companies rather than contributing to the 0-100 score. Mirrors accumulation_de_max.
+    swing_de_max: float = 1.5
+
     # --- api ---
     api_token: SecretStr | None = None
 
@@ -148,6 +154,9 @@ class Settings(BaseSettings):
     daily_exit_monitor_minutes: list[int] = Field(
         default_factory=lambda: [930, 1015, 1100, 1330, 1500]
     )
+    # NSE's bhavcopy delivery report is typically published by ~19:00 IST
+    daily_delivery_fetch_hour_ist: int = 19
+    daily_delivery_fetch_minute_ist: int = 30
 
     model_config = SettingsConfigDict(
         env_file=".env",

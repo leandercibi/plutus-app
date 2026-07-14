@@ -14,9 +14,7 @@ from pathlib import Path
 
 import pytest
 
-_SCORING_DIR = (
-    Path(__file__).parents[3] / "src" / "plutus" / "swing" / "scoring"
-)
+_SCORING_DIR = Path(__file__).parents[3] / "src" / "plutus" / "swing" / "scoring"
 _GUARDED_FILES = (
     "rs_pillar.py",
     "flow_pillar.py",

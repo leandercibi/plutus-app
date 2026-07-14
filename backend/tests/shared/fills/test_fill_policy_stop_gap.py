@@ -85,9 +85,7 @@ def test_stop_not_triggered_returns_none(policy: FillPolicy) -> None:
 def test_target_intra_bar_touch_fills_at_target(policy: FillPolicy) -> None:
     plan = _plan()
     next_bar = _bar(date(2025, 1, 4), "105", "112", "104", "111")  # high 112 >= T1 110
-    fill = policy.fill_target(
-        plan, next_bar, target_level=1, adv=1_000_000, atr_pct=0.02
-    )
+    fill = policy.fill_target(plan, next_bar, target_level=1, adv=1_000_000, atr_pct=0.02)
     assert fill is not None
     # touch fill near 110 with sell slippage
     assert fill.price < Decimal("110")
@@ -97,9 +95,7 @@ def test_target_gap_through_fills_at_open(policy: FillPolicy) -> None:
     plan = _plan()
     # gaps up through T2 120; opens at 125
     next_bar = _bar(date(2025, 1, 5), "125", "128", "124", "127")
-    fill = policy.fill_target(
-        plan, next_bar, target_level=2, adv=1_000_000, atr_pct=0.02
-    )
+    fill = policy.fill_target(plan, next_bar, target_level=2, adv=1_000_000, atr_pct=0.02)
     assert fill is not None
     # gap-through fills at open (125) minus slippage, not at target 120
     assert fill.price > Decimal("120")
@@ -108,7 +104,5 @@ def test_target_gap_through_fills_at_open(policy: FillPolicy) -> None:
 def test_target_not_reached_returns_none(policy: FillPolicy) -> None:
     plan = _plan()
     next_bar = _bar(date(2025, 1, 4), "105", "108", "104", "107")  # high 108 < T1 110
-    fill = policy.fill_target(
-        plan, next_bar, target_level=1, adv=1_000_000, atr_pct=0.02
-    )
+    fill = policy.fill_target(plan, next_bar, target_level=1, adv=1_000_000, atr_pct=0.02)
     assert fill is None

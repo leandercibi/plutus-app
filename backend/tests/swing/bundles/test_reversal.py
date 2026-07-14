@@ -8,9 +8,7 @@ from plutus.swing.bundles.base import BundleContext
 from plutus.swing.bundles.reversal import ReversalBundle
 
 
-def _delivery_frame(
-    dates: pd.Series, traded: list[int], pct: list[float]
-) -> pd.DataFrame:
+def _delivery_frame(dates: pd.Series, traded: list[int], pct: list[float]) -> pd.DataFrame:
     delivery_qty = [int(t * p) for t, p in zip(traded, pct, strict=True)]
     return pd.DataFrame(
         {

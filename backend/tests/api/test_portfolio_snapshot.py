@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date
 from unittest.mock import patch
 
 import pandas as pd
@@ -72,7 +72,9 @@ def test_list_notifications_returns_empty_initially(
 
 @pytest.mark.usefixtures("_mock_yfinance")
 def test_portfolio_snapshot_stores_latest_prices(
-    client: TestClient, auth_headers: dict[str, str], session_factory,
+    client: TestClient,
+    auth_headers: dict[str, str],
+    session_factory,
 ) -> None:
     from plutus.db.models import LatestPrice
 

@@ -7,6 +7,10 @@ import { Skeleton } from '../components/ui/Skeleton'
 import { ErrorBanner } from '../components/ui/ErrorBanner'
 import { AiSummaryCard } from '../components/ui/AiSummaryCard'
 import { PositionsIcon } from '../components/icons'
+import {
+  useChartPanel, ChartToggleButton, ChartPanelBody, DaysControl, OverlayControls,
+  DEFAULT_CHART_INDICATORS, type ChartIndicators,
+} from '../components/chart/ChartPanel'
 import type { PositionSnapshot, SwingTrade } from '../types/api'
 
 // ── Exit modal ────────────────────────────────────────────────────────────────
@@ -236,6 +240,84 @@ function ExitModal({
   )
 }
 
+// ── Position row (with expandable chart) ───────────────────────────────────────
+
+function PositionRow({
+  position,
+  trade,
+  days,
+  indicators,
+  onExit,
+}: {
+  position: PositionSnapshot
+  trade: SwingTrade | undefined
+  days: number
+  indicators: ChartIndicators
+  onExit: () => void
+}) {
+  // Swing positions carry a signal_id (so Entry/SL/T1/T2 markers show); accumulation
+  // positions have no linked signal, so the chart just omits those markers.
+  const { expanded, setExpanded, chart } = useChartPanel(position.symbol, trade?.signal_id, days)
+  const pnlColor = position.pnl >= 0 ? 'var(--green)' : 'var(--red)'
+
+  return (
+    <>
+      <tr style={{ borderBottom: expanded ? 'none' : '1px solid var(--faint)' }}>
+        <td style={{ padding: '12px 16px', fontWeight: 700 }}>{position.symbol}</td>
+        <td style={{ padding: '12px 16px' }}>
+          <span style={{
+            fontSize: 11, padding: '2px 6px', borderRadius: 4,
+            background: 'var(--faint)', color: 'var(--muted)', textTransform: 'uppercase',
+          }}>{position.mode}</span>
+        </td>
+        <td style={{ padding: '12px 16px', color: 'var(--muted)' }}>{position.qty}</td>
+        <td style={{ padding: '12px 16px' }}>₹{position.avg_cost.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</td>
+        <td style={{ padding: '12px 16px', fontWeight: 600 }}>₹{position.current_price.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</td>
+        <td style={{ padding: '12px 16px', color: 'var(--red)' }}>
+          {position.stop_loss != null ? `₹${position.stop_loss.toLocaleString('en-IN', { maximumFractionDigits: 2 })}` : '—'}
+        </td>
+        <td style={{ padding: '12px 16px', color: 'var(--muted)', fontSize: 12 }}>
+          {position.sl_distance_pct != null ? `${position.sl_distance_pct.toFixed(1)}%` : '—'}
+        </td>
+        <td style={{ padding: '12px 16px', color: pnlColor, fontWeight: 600 }}>
+          {position.pnl >= 0 ? '+' : ''}₹{position.pnl.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+        </td>
+        <td style={{ padding: '12px 16px', color: pnlColor, fontSize: 12 }}>
+          {position.pnl_pct >= 0 ? '+' : ''}{position.pnl_pct.toFixed(1)}%
+        </td>
+        <td style={{ padding: '12px 16px' }}>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            {trade ? (
+              <button
+                onClick={onExit}
+                style={{
+                  padding: '5px 12px',
+                  background: 'rgba(242,54,69,0.1)', border: '1px solid var(--red)',
+                  borderRadius: 6, color: 'var(--red)', fontSize: 11, fontWeight: 700,
+                  cursor: 'pointer',
+                }}>
+                Exit
+              </button>
+            ) : (
+              <span style={{ fontSize: 11, color: 'var(--dim)' }}>—</span>
+            )}
+            <ChartToggleButton expanded={expanded} onToggle={() => setExpanded(e => !e)} />
+          </div>
+        </td>
+      </tr>
+      {expanded && (
+        <tr style={{ borderBottom: '1px solid var(--faint)' }}>
+          <td colSpan={10} style={{ padding: 0 }}>
+            <div style={{ borderTop: '1px solid var(--border)' }}>
+              <ChartPanelBody chart={chart} indicators={indicators} height={320} />
+            </div>
+          </td>
+        </tr>
+      )}
+    </>
+  )
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function Positions() {
@@ -247,6 +329,10 @@ export default function Positions() {
   const refreshDaily = useRefreshAiSummary('daily')
 
   const [exitTarget, setExitTarget] = useState<{ position: PositionSnapshot; trade: SwingTrade } | null>(null)
+  const [days, setDays] = useState(90)
+  const [indicators, setIndicators] = useState<ChartIndicators>(DEFAULT_CHART_INDICATORS)
+  const toggleInd = (k: keyof ChartIndicators) =>
+    setIndicators(prev => ({ ...prev, [k]: !prev[k] }))
 
   if (error) return <ErrorBanner message={String(error)} />
 
@@ -278,6 +364,18 @@ export default function Positions() {
         </div>
       )}
 
+      {!snap.isLoading && positions.length > 0 && (
+        <div style={{
+          display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center',
+          background: 'var(--surface)', border: '1px solid var(--border)',
+          borderRadius: 10, padding: '10px 14px',
+        }}>
+          <DaysControl days={days} setDays={setDays} />
+          <div style={{ width: 1, height: 20, background: 'var(--border)' }} />
+          <OverlayControls indicators={indicators} toggleIndicator={toggleInd} />
+        </div>
+      )}
+
       {snap.isLoading ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {[...Array(3)].map((_, i) => <Skeleton key={i} h={60} />)}
@@ -293,48 +391,16 @@ export default function Positions() {
               </tr>
             </thead>
             <tbody>
-              {positions.map(p => {
-                const trade    = tradeBySymbol[p.symbol]
-                const pnlColor = p.pnl >= 0 ? 'var(--green)' : 'var(--red)'
-                return (
-                  <tr key={p.symbol} style={{ borderBottom: '1px solid var(--faint)' }}>
-                    <td style={{ padding: '12px 16px', fontWeight: 700 }}>{p.symbol}</td>
-                    <td style={{ padding: '12px 16px' }}>
-                      <span style={{
-                        fontSize: 11, padding: '2px 6px', borderRadius: 4,
-                        background: 'var(--faint)', color: 'var(--muted)', textTransform: 'uppercase',
-                      }}>{p.mode}</span>
-                    </td>
-                    <td style={{ padding: '12px 16px', color: 'var(--muted)' }}>{p.qty}</td>
-                    <td style={{ padding: '12px 16px' }}>₹{p.avg_cost.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</td>
-                    <td style={{ padding: '12px 16px', fontWeight: 600 }}>₹{p.current_price.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</td>
-                    <td style={{ padding: '12px 16px', color: 'var(--red)' }}>₹{p.stop_loss.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</td>
-                    <td style={{ padding: '12px 16px', color: 'var(--muted)', fontSize: 12 }}>{p.sl_distance_pct.toFixed(1)}%</td>
-                    <td style={{ padding: '12px 16px', color: pnlColor, fontWeight: 600 }}>
-                      {p.pnl >= 0 ? '+' : ''}₹{p.pnl.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
-                    </td>
-                    <td style={{ padding: '12px 16px', color: pnlColor, fontSize: 12 }}>
-                      {p.pnl_pct >= 0 ? '+' : ''}{p.pnl_pct.toFixed(1)}%
-                    </td>
-                    <td style={{ padding: '12px 16px' }}>
-                      {trade ? (
-                        <button
-                          onClick={() => setExitTarget({ position: p, trade })}
-                          style={{
-                            padding: '5px 12px',
-                            background: 'rgba(242,54,69,0.1)', border: '1px solid var(--red)',
-                            borderRadius: 6, color: 'var(--red)', fontSize: 11, fontWeight: 700,
-                            cursor: 'pointer',
-                          }}>
-                          Exit
-                        </button>
-                      ) : (
-                        <span style={{ fontSize: 11, color: 'var(--dim)' }}>—</span>
-                      )}
-                    </td>
-                  </tr>
-                )
-              })}
+              {positions.map(p => (
+                <PositionRow
+                  key={p.symbol}
+                  position={p}
+                  trade={tradeBySymbol[p.symbol]}
+                  days={days}
+                  indicators={indicators}
+                  onExit={() => setExitTarget({ position: p, trade: tradeBySymbol[p.symbol] })}
+                />
+              ))}
               {!positions.length && (
                 <tr>
                   <td colSpan={10} style={{ padding: '32px 16px', textAlign: 'center', fontSize: 13, color: 'var(--dim)' }}>

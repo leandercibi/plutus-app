@@ -109,8 +109,6 @@ def test_midweek_gated_off_is_noop() -> None:
 
 
 def test_midweek_enabled_runs() -> None:
-    result = midweek_mini_screen_job(
-        Settings(_env_file=None, midweek_mini_screen_enabled=True)
-    )
+    result = midweek_mini_screen_job(Settings(_env_file=None, midweek_mini_screen_enabled=True))
     assert result.status == "OK"
     assert result.aborted_reason is None

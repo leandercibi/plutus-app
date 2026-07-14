@@ -47,9 +47,12 @@ class FundamentalsProvider:
         pe_ttm = _f(info.get("trailingPE"))
         ev_ebitda = _f(info.get("enterpriseToEbitda"))
 
-        # yfinance returns debtToEquity as a percentage: 45.2 means D/E = 0.452
+        # yfinance returns debtToEquity as a percentage: 45.2 means D/E = 0.452. Always
+        # divide — a conditional threshold here previously misread low-debt companies
+        # (e.g. ITC, HINDUNILVR) whose raw value happens to be under 10 as already-
+        # fractional, producing D/E ratios of 3+ for near-zero-debt blue chips.
         de_raw = _f(info.get("debtToEquity"), default=0.0) or 0.0
-        de = de_raw / 100.0 if de_raw > 10.0 else de_raw
+        de = de_raw / 100.0
 
         # returnOnEquity is fractional (0.18 = 18%); guard against rare % form
         roe_raw = _f(info.get("returnOnEquity"), default=0.0) or 0.0

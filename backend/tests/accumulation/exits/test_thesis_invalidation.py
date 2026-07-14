@@ -55,9 +55,7 @@ def test_hard_avoid_post_entry_triggers_exit(exit_eval: ThesisInvalidationExit) 
     """B9 hallmark: a hard-avoid condition firing on re-score forces an EXIT even at a
     loss, and the position transitions to EXITED."""
     position = _position()
-    decision = exit_eval.evaluate(
-        position, _snapshot(going_concern_flag=True, de=3.0)
-    )
+    decision = exit_eval.evaluate(position, _snapshot(going_concern_flag=True, de=3.0))
     assert decision.exit is True
     assert decision.new_state == "EXITED"
     assert position.state == "EXITED"

@@ -29,9 +29,7 @@ def _candles() -> pd.DataFrame:
     )
 
 
-def _fit_on_first_day(
-    symbol: str, candles: pd.DataFrame, day: date
-) -> BundleSignal | None:
+def _fit_on_first_day(symbol: str, candles: pd.DataFrame, day: date) -> BundleSignal | None:
     if day != date(2025, 1, 1):
         return None
     return BundleSignal(

@@ -3,9 +3,7 @@ from __future__ import annotations
 from fastapi.testclient import TestClient
 
 
-def test_runs_sunday_returns_run_id(
-    client: TestClient, auth_headers: dict[str, str]
-) -> None:
+def test_runs_sunday_returns_run_id(client: TestClient, auth_headers: dict[str, str]) -> None:
     resp = client.post("/shared/runs/sunday", headers=auth_headers)
     assert resp.status_code == 200
     assert "run_id" in resp.json()

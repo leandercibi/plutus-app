@@ -60,9 +60,7 @@ def test_paused_list_with_reasons() -> None:
 
 
 def test_empty_paused_list_renders_none() -> None:
-    inputs = AccumulationPostmortemInputs(
-        week_ending=date(2024, 6, 7), positions=[], paused=[]
-    )
+    inputs = AccumulationPostmortemInputs(week_ending=date(2024, 6, 7), positions=[], paused=[])
     md = build_accumulation_postmortem_md(inputs)
     assert "Paused" in md
     assert "none" in md.lower()

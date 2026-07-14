@@ -50,9 +50,7 @@ def test_windows_slide_by_step_days() -> None:
 def test_windows_stop_before_oos_exceeds_end() -> None:
     wf = _wf()
     end = date(2020, 9, 1)
-    pairs = list(
-        wf.windows(date(2020, 1, 1), end, train_days=180, oos_days=30, step_days=30)
-    )
+    pairs = list(wf.windows(date(2020, 1, 1), end, train_days=180, oos_days=30, step_days=30))
     for _, oos in pairs:
         assert oos.end <= end
 

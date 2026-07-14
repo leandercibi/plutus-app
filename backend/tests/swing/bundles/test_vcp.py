@@ -8,9 +8,7 @@ from plutus.swing.bundles.base import BundleContext
 from plutus.swing.bundles.vcp import VCPBundle
 
 
-def _delivery_frame(
-    dates: pd.Series, traded: list[int], pct: list[float]
-) -> pd.DataFrame:
+def _delivery_frame(dates: pd.Series, traded: list[int], pct: list[float]) -> pd.DataFrame:
     delivery_qty = [int(t * p) for t, p in zip(traded, pct, strict=True)]
     return pd.DataFrame(
         {
@@ -22,9 +20,7 @@ def _delivery_frame(
     )
 
 
-def _contraction(
-    center: float, amplitude: float, length: int, volume: int
-) -> dict[str, list]:
+def _contraction(center: float, amplitude: float, length: int, volume: int) -> dict[str, list]:
     """A single contraction: oscillation of given amplitude around center."""
     closes = [center + amplitude * np.sin(i) for i in range(length)]
     return {

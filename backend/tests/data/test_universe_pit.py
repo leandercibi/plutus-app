@@ -54,9 +54,7 @@ def _make_lookup(frames: dict[str, pd.DataFrame]):  # type: ignore[no-untyped-de
 
 
 @pytest.mark.hallmark
-def test_membership_matches_frozen_fixture(
-    settings_floor: Settings, session: Session
-) -> None:
+def test_membership_matches_frozen_fixture(settings_floor: Settings, session: Session) -> None:
     as_of = date(2025, 6, 30)
     # LIQUID: 300 days history, 100*1_000_000 traded value = 1e8 >= 5e7 floor
     # THIN: 300 days but only 100*100_000 = 1e7 < floor
@@ -79,9 +77,7 @@ def test_membership_matches_frozen_fixture(
 
 
 @pytest.mark.hallmark
-def test_pit_lookup_differs_across_dates(
-    settings_floor: Settings, session: Session
-) -> None:
+def test_pit_lookup_differs_across_dates(settings_floor: Settings, session: Session) -> None:
     today = date(2025, 6, 30)
     year_ago = date(2024, 6, 30)
     # ACME becomes liquid only recently: liquid as of today, thin a year ago
@@ -108,9 +104,7 @@ def test_pit_lookup_differs_across_dates(
     assert get_universe_at(today, session) == frozenset({"ACME"})
 
 
-def test_liquidity_floor_in_rupees_enforced(
-    settings_floor: Settings, session: Session
-) -> None:
+def test_liquidity_floor_in_rupees_enforced(settings_floor: Settings, session: Session) -> None:
     as_of = date(2025, 6, 30)
     # exactly at floor: 50 * 1_000_000 = 5e7 == floor -> included
     at_floor = _liquid_history(50.0, 1_000_000, 300, as_of)

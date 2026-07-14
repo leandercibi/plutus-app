@@ -54,6 +54,11 @@ def _load_instruments() -> dict[str, str]:
         return _INSTRUMENT_CACHE
 
 
+def list_nse_symbols() -> list[str]:
+    """All NSE equity symbols from Angel One's script master, sorted alphabetically."""
+    return sorted(_load_instruments().keys())
+
+
 def _resolve_token(symbol: str) -> str:
     instruments = _load_instruments()
     token = instruments.get(symbol.upper())

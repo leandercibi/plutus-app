@@ -25,9 +25,7 @@ def test_formula_exact() -> None:
     n = 30
     prior_weight = 30.0
     # shrinkage = 30/60 = 0.5 -> 1.5*0.5 + 0.5*0.5 = 1.0
-    result = shrunk_sharpe(
-        raw, n_trades=n, prior_mean=prior_mean, prior_weight=prior_weight
-    )
+    result = shrunk_sharpe(raw, n_trades=n, prior_mean=prior_mean, prior_weight=prior_weight)
     assert result == 1.0
 
 

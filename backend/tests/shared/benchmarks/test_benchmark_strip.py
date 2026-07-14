@@ -12,12 +12,8 @@ from plutus.shared.types import BacktestTrade
 def _trades() -> list[BacktestTrade]:
     return [
         BacktestTrade("A", "trend", "BULL", date(2024, 1, 1), date(2024, 1, 5), 2.0, 4),
-        BacktestTrade(
-            "B", "trend", "BULL", date(2024, 1, 6), date(2024, 1, 9), -1.0, 3
-        ),
-        BacktestTrade(
-            "C", "trend", "BULL", date(2024, 1, 10), date(2024, 1, 12), 1.0, 2
-        ),
+        BacktestTrade("B", "trend", "BULL", date(2024, 1, 6), date(2024, 1, 9), -1.0, 3),
+        BacktestTrade("C", "trend", "BULL", date(2024, 1, 10), date(2024, 1, 12), 1.0, 2),
     ]
 
 

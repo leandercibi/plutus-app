@@ -38,9 +38,7 @@ class _Spy:
 
 def _ctx() -> EntryContext:
     # 20 baseline days + a strong confirmation candle (2x median) so the volume gate passes
-    delivery = pd.DataFrame(
-        {"traded_qty": [100_000] * 20 + [200_000], "delivery_pct": [0.5] * 21}
-    )
+    delivery = pd.DataFrame({"traded_qty": [100_000] * 20 + [200_000], "delivery_pct": [0.5] * 21})
     candles = pd.DataFrame({"close": [10.0] * 21})
     return EntryContext(
         candles=candles,
@@ -109,9 +107,7 @@ def test_volume_failure_short_circuits_before_heat() -> None:
     )
     ctx = _ctx()
     # weak confirmation volume -> volume gate fails
-    delivery = pd.DataFrame(
-        {"traded_qty": [100_000] * 20 + [100_000], "delivery_pct": [0.5] * 21}
-    )
+    delivery = pd.DataFrame({"traded_qty": [100_000] * 20 + [100_000], "delivery_pct": [0.5] * 21})
     ctx = EntryContext(
         candles=ctx.candles,
         delivery=delivery,

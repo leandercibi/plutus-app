@@ -38,11 +38,7 @@ def test_seq_one_to_five_accepted(session: Session) -> None:
         session.add(_tranche(pid, seq=seq))
     session.commit()
     seqs = [
-        t.seq
-        for t in session.query(Tranche)
-        .filter_by(position_id=pid)
-        .order_by(Tranche.seq)
-        .all()
+        t.seq for t in session.query(Tranche).filter_by(position_id=pid).order_by(Tranche.seq).all()
     ]
     assert seqs == [1, 2, 3, 4, 5]
 

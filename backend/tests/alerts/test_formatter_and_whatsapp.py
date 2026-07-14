@@ -10,9 +10,7 @@ from plutus.config.settings import Settings
 
 def test_entry_message_has_all_fields() -> None:
     fmt = AlertFormatter()
-    msg = fmt.format_entry(
-        "INFY", Decimal("100"), Decimal("95"), Decimal("110"), date(2025, 1, 1)
-    )
+    msg = fmt.format_entry("INFY", Decimal("100"), Decimal("95"), Decimal("110"), date(2025, 1, 1))
     assert msg.symbol == "INFY"
     assert "*INFY*" in msg.body_md
     assert msg.deduplication_key == "INFY:ENTRY:2025-01-01"

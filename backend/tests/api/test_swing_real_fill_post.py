@@ -3,9 +3,7 @@ from __future__ import annotations
 from fastapi.testclient import TestClient
 
 
-def test_post_real_fill_returned(
-    client: TestClient, auth_headers: dict[str, str]
-) -> None:
+def test_post_real_fill_returned(client: TestClient, auth_headers: dict[str, str]) -> None:
     body = {
         "side": "BUY",
         "qty": 100,
@@ -38,9 +36,7 @@ def test_post_real_fill_persists_alongside_mock(
     assert resp.status_code == 200
 
 
-def test_post_real_fill_unknown_trade_404(
-    client: TestClient, auth_headers: dict[str, str]
-) -> None:
+def test_post_real_fill_unknown_trade_404(client: TestClient, auth_headers: dict[str, str]) -> None:
     body = {
         "side": "BUY",
         "qty": 1,
