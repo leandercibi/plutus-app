@@ -235,8 +235,11 @@ export function useEnterSignal() {
 export function useExitTrade() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ tradeId, reason }: { tradeId: number; reason: string }) =>
-      apiClient.post(`/swing/trades/${tradeId}/exit/manual`, { reason }).then(r => r.data),
+    // qty omitted → full close (backend closes trade, sets state = CLOSED_WIN/LOSS).
+    // qty < trade.qty → partial exit (backend logs SELL fill, decrements qty, stays OPEN).
+    mutationFn: ({ tradeId, reason, qty }: { tradeId: number; reason: string; qty?: number }) =>
+      apiClient.post(`/swing/trades/${tradeId}/exit/manual`,
+        qty !== undefined ? { reason, qty } : { reason }).then(r => r.data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['swing-positions'] })
       qc.invalidateQueries({ queryKey: ['portfolio-snapshot'] })

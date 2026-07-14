@@ -215,10 +215,64 @@ def enter_from_signal(
 
 @router.post("/trades/{trade_id}/exit/manual", response_model=SwingTradeOut)
 def manual_exit(trade_id: int, body: ManualExitIn, db: Session = Depends(get_db)) -> SwingTradeOut:
+    """Close a swing trade — fully by default, partially if ``body.qty`` < remaining.
+
+    Partial exit path: logs a SELL Fill for the specified qty (at ``body.price``
+    or the latest cached LatestPrice for the symbol), decrements ``trade.qty``,
+    and keeps the trade OPEN / T1_HIT. Full exit path (qty omitted or >=
+    remaining) closes the trade and sets state to CLOSED_WIN/CLOSED_LOSS as
+    before. No alert is re-fired here — alerting is the monitor's job.
+    """
+    from decimal import Decimal
+
+    from plutus.db.models import LatestPrice
+
     trade = db.get(SwingTrade, trade_id)
     if trade is None:
         raise HTTPException(status_code=404, detail="trade not found")
-    # Manual close. No alert is re-fired here; alerting is the monitor's job.
+
+    is_partial = body.qty is not None and body.qty < trade.qty
+    if body.qty is not None and body.qty <= 0:
+        raise HTTPException(status_code=400, detail="qty must be positive")
+
+    if is_partial:
+        sell_qty = cast(int, body.qty)
+        # Fill needs a concrete price — use the caller's if given, else the latest cached
+        # LatestPrice for this symbol. Fail loud rather than silently defaulting to 0.
+        if body.price is not None:
+            sell_price = body.price
+        else:
+            latest = (
+                db.execute(select(LatestPrice).where(LatestPrice.symbol == trade.symbol))
+                .scalars()
+                .first()
+            )
+            if latest is None:
+                raise HTTPException(
+                    status_code=422,
+                    detail=(
+                        f"No cached price for {trade.symbol}; pass an explicit "
+                        f"`price` in the request body for partial exits."
+                    ),
+                )
+            sell_price = Decimal(str(latest.price))
+
+        db.add(
+            Fill(
+                trade_id=trade.id,
+                kind="REAL",
+                side="SELL",
+                qty=sell_qty,
+                price=sell_price,
+                cost_inr=Decimal("0"),
+                filled_at=datetime.utcnow(),
+            )
+        )
+        trade.qty -= sell_qty
+        db.flush()
+        return SwingTradeOut.model_validate(trade, from_attributes=True)
+
+    # Full exit (qty omitted or covers the whole remaining position).
     realized = trade.realized_R if trade.realized_R is not None else 0.0
     trade.state = "CLOSED_WIN" if realized >= 0 else "CLOSED_LOSS"
     trade.closed_at = datetime.utcnow()

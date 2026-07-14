@@ -23,6 +23,11 @@ export interface PositionSnapshot {
   pnl_pct: number
   stop_loss: number | null
   sl_distance_pct: number | null
+  // Populated for swing lots only (one snapshot row per SwingTrade). Enables the
+  // Positions page to aggregate rows by symbol and dispatch per-lot Exit / partial
+  // sell actions to the right specific trade.
+  trade_id: number | null
+  opened_at: string | null
 }
 
 export interface PortfolioSnapshot {

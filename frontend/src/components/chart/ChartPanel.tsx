@@ -22,9 +22,14 @@ export function useChartPanel(symbol: string, signalId: number | undefined, days
 export function ChartToggleButton({
   expanded,
   onToggle,
+  label = 'Chart',
 }: {
   expanded: boolean
   onToggle: () => void
+  /** Text after the chevron when collapsed. Defaults to "Chart"; Positions passes
+   * "Lots" for multi-lot rows since the expanded panel there is dominated by
+   * the per-lot history table, not the chart. */
+  label?: string
 }) {
   return (
     <button onClick={onToggle} style={{
@@ -32,7 +37,7 @@ export function ChartToggleButton({
       background: expanded ? 'var(--faint)' : 'transparent',
       border: '1px solid var(--border)', borderRadius: 8,
       color: 'var(--muted)', fontSize: 12, cursor: 'pointer',
-    }}>{expanded ? '▲' : '▼ Chart'}</button>
+    }}>{expanded ? '▲' : `▼ ${label}`}</button>
   )
 }
 
