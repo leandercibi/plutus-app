@@ -8,18 +8,13 @@ import { ErrorBanner } from '../components/ui/ErrorBanner'
 import { AiSummaryCard } from '../components/ui/AiSummaryCard'
 import { PositionsIcon } from '../components/icons'
 import {
-  useChartPanel, ChartToggleButton, ChartPanelBody, DaysControl, OverlayControls,
+  useChartPanel, ChartPanelBody, DaysControl, OverlayControls,
   DEFAULT_CHART_INDICATORS, type ChartIndicators,
 } from '../components/chart/ChartPanel'
 import type { PositionSnapshot } from '../types/api'
 
 // ── Hover-aware button ────────────────────────────────────────────────────────
 
-/** Tiny wrapper that gives inline-styled buttons a visible hover + pressed state.
- * The codebase uses inline styles throughout, and inline styles can't express
- * :hover / :active, so we track hover/press in state and apply the caller's
- * `hoverStyle` / `activeStyle` overrides on top of the base. Keeps every action
- * button on this page consistent without pulling in a CSS solution. */
 function HoverButton({
   onClick, disabled, title, children, style, hoverStyle, activeStyle,
 }: {
@@ -64,11 +59,6 @@ const SELL_BUTTON_ACTIVE: CSSProperties = { background: 'rgba(242,54,69,0.35)', 
 
 // ── Aggregation ───────────────────────────────────────────────────────────────
 
-/** One row-per-symbol view built from the raw per-lot PositionSnapshot rows
- * the backend returns. Weighted avg cost, weighted P&L%, tightest (i.e. first
- * to trigger) stop-loss — matches how brokers display consolidated positions.
- * The original per-lot rows are preserved as `lots` for the expandable view
- * and for dispatching per-lot Exit / partial-sell actions to the right trade. */
 type AggregatedPosition = {
   symbol: string
   mode: string
@@ -77,15 +67,13 @@ type AggregatedPosition = {
   current_price: number
   invested: number
   pnl: number                  // sum of lot pnls (₹)
-  pnl_pct: number              // weighted by invested, not average-of-percents
+  pnl_pct: number              // weighted by invested
   stop_loss: number | null     // tightest SL across lots
   sl_distance_pct: number | null
-  lots: PositionSnapshot[]
+  lots: PositionSnapshot[]     // sorted oldest → newest for FIFO
 }
 
 function aggregate(positions: PositionSnapshot[]): AggregatedPosition[] {
-  // Group by symbol+mode so a hypothetical swing + accumulation on the same
-  // symbol stay distinct (they display differently and have different actions).
   const groups = new Map<string, PositionSnapshot[]>()
   for (const p of positions) {
     const key = `${p.symbol}|${p.mode}`
@@ -95,16 +83,21 @@ function aggregate(positions: PositionSnapshot[]): AggregatedPosition[] {
   }
 
   const out: AggregatedPosition[] = []
-  for (const lots of groups.values()) {
+  for (const rawLots of groups.values()) {
+    // Sort lots oldest → newest so downstream FIFO logic + history rendering
+    // are consistent. Lots without opened_at sink to the bottom.
+    const lots = [...rawLots].sort((a, b) => {
+      const at = a.opened_at ? new Date(a.opened_at).getTime() : Number.POSITIVE_INFINITY
+      const bt = b.opened_at ? new Date(b.opened_at).getTime() : Number.POSITIVE_INFINITY
+      return at - bt
+    })
     const qty = lots.reduce((s, l) => s + l.qty, 0)
     const invested = lots.reduce((s, l) => s + l.avg_cost * l.qty, 0)
-    const current_price = lots[0].current_price   // all lots for a symbol share the same CMP
+    const current_price = lots[0].current_price
     const pnl = lots.reduce((s, l) => s + l.pnl, 0)
     const avg_cost = qty > 0 ? invested / qty : 0
     const pnl_pct = invested > 0 ? (pnl / invested) * 100 : 0
 
-    // Tightest = highest SL (for long positions the SL sits below entry, so the
-    // highest number is closest to CMP → triggers first → the risk to know about).
     const sls = lots.map(l => l.stop_loss).filter((v): v is number => v != null)
     const stop_loss = sls.length ? Math.max(...sls) : null
     const sl_distance_pct = stop_loss != null && current_price > 0
@@ -125,13 +118,11 @@ function aggregate(positions: PositionSnapshot[]): AggregatedPosition[] {
       lots,
     })
   }
-  // Biggest movers first — winners AND losers surface, since |pnl| is what you
-  // scan for when deciding "what needs my attention right now".
   out.sort((a, b) => Math.abs(b.pnl) - Math.abs(a.pnl))
   return out
 }
 
-// ── Sell modal (full close or partial sell) ───────────────────────────────────
+// ── Sell modal (single unified flow for single- and multi-lot) ────────────────
 
 const EXIT_REASONS = [
   'Target reached',
@@ -142,45 +133,84 @@ const EXIT_REASONS = [
   'Manual exit',
 ]
 
+/** Given an aggregated position and a total qty the user wants to sell,
+ * return the per-lot slice plan using FIFO (oldest lot first). Emits one
+ * entry per lot that will be touched; each carries the lot ref, the qty
+ * being sold from that lot, and whether it closes the lot fully. */
+function planFifoSell(agg: AggregatedPosition, sellQty: number): { lot: PositionSnapshot; qty: number; full: boolean }[] {
+  const plan: { lot: PositionSnapshot; qty: number; full: boolean }[] = []
+  let remaining = sellQty
+  for (const lot of agg.lots) {
+    if (remaining <= 0) break
+    if (lot.trade_id == null) continue   // can't sell what has no trade ref
+    const take = Math.min(lot.qty, remaining)
+    plan.push({ lot, qty: take, full: take === lot.qty })
+    remaining -= take
+  }
+  return plan
+}
+
 function SellModal({
-  lot,
+  agg,
   onClose,
 }: {
-  lot: PositionSnapshot   // must have trade_id for a sell to be possible
+  agg: AggregatedPosition
   onClose: () => void
 }) {
-  const ltpQuery  = useLTP(lot.symbol)
-  const cmp       = ltpQuery.data ?? lot.current_price
+  const ltpQuery  = useLTP(agg.symbol)
+  const cmp       = ltpQuery.data ?? agg.current_price
   const exitTrade = useExitTrade()
 
-  const [qty, setQty]       = useState(String(lot.qty))
+  const [qty, setQty]       = useState(String(agg.qty))
   const [reason, setReason] = useState(EXIT_REASONS[0])
   const [customReason, setCustomReason] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
 
   const qtyVal = parseInt(qty, 10)
-  const isValid = !isNaN(qtyVal) && qtyVal > 0 && qtyVal <= lot.qty
-  const isPartial = isValid && qtyVal < lot.qty
+  const isValid = !isNaN(qtyVal) && qtyVal > 0 && qtyVal <= agg.qty
+  const isPartial = isValid && qtyVal < agg.qty
+  const isMultiLot = agg.lots.length > 1
+
+  const plan = useMemo(() => (isValid ? planFifoSell(agg, qtyVal) : []), [agg, qtyVal, isValid])
 
   const exitPrice = cmp
   const totalValue = isValid && exitPrice ? qtyVal * exitPrice : null
-  const pnl = totalValue != null ? totalValue - qtyVal * lot.avg_cost : null
+  // Weighted realised P&L on the sliced qty, using per-lot avg costs.
+  const plannedInvested = plan.reduce((s, p) => s + p.qty * p.lot.avg_cost, 0)
+  const pnl = totalValue != null ? totalValue - plannedInvested : null
 
   const finalReason = reason === 'Manual exit' && customReason.trim()
     ? customReason.trim()
     : reason
 
-  const handleSubmit = () => {
-    if (!isValid || lot.trade_id == null) return
-    exitTrade.mutate(
-      // Omit qty on full close so backend hits the classic close-and-set-state
-      // path. Send it on partial so backend logs a SELL fill and stays OPEN.
-      { tradeId: lot.trade_id, reason: finalReason, qty: isPartial ? qtyVal : undefined },
-      { onSuccess: () => onClose() },
-    )
+  const handleSubmit = async () => {
+    if (!isValid || plan.length === 0) return
+    setSubmitError(null)
+    setSubmitting(true)
+    try {
+      // Sequential: each mutation invalidates portfolio-snapshot and mutates
+      // trade.qty on the backend; parallel would race on stale reads.
+      for (const step of plan) {
+        const tid = step.lot.trade_id
+        if (tid == null) continue
+        await new Promise<void>((resolve, reject) => {
+          exitTrade.mutate(
+            { tradeId: tid, reason: finalReason, qty: step.full ? undefined : step.qty },
+            { onSuccess: () => resolve(), onError: err => reject(err) },
+          )
+        })
+      }
+      onClose()
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const handleBackdrop = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (e.target === e.currentTarget) onClose()
+    if (e.target === e.currentTarget && !submitting) onClose()
   }
 
   return (
@@ -195,28 +225,25 @@ function SellModal({
     >
       <div style={{
         background: 'var(--surface)', border: '1px solid var(--border)',
-        borderRadius: 16, padding: 28, width: 460, maxWidth: '92vw',
+        borderRadius: 16, padding: 28, width: 500, maxWidth: '92vw',
+        maxHeight: '92vh', overflowY: 'auto',
         display: 'flex', flexDirection: 'column', gap: 20,
         boxShadow: '0 24px 64px rgba(0,0,0,0.6)',
       }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
           <div>
-            <div style={{ fontWeight: 800, fontSize: 18 }}>{lot.symbol}</div>
+            <div style={{ fontWeight: 800, fontSize: 18 }}>{agg.symbol}</div>
             <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 3 }}>
-              {isPartial ? 'Partial sell' : 'Full exit'} · {lot.qty} shares in this lot
-              {lot.opened_at != null && (
-                <span style={{ color: 'var(--dim)' }}>
-                  {' · opened '}
-                  {new Date(lot.opened_at).toLocaleDateString('en-IN', {
-                    day: 'numeric', month: 'short', year: 'numeric',
-                  })}
-                </span>
+              {isPartial ? 'Partial sell' : 'Full exit'}
+              {' · '}{agg.qty} shares across {agg.lots.length} lot{agg.lots.length !== 1 ? 's' : ''}
+              {isMultiLot && (
+                <span style={{ color: 'var(--dim)' }}> · FIFO (oldest first)</span>
               )}
             </div>
           </div>
-          <button onClick={onClose} style={{
+          <button onClick={onClose} disabled={submitting} style={{
             background: 'transparent', border: 'none', color: 'var(--muted)',
-            fontSize: 18, cursor: 'pointer', padding: '0 4px', lineHeight: 1,
+            fontSize: 18, cursor: submitting ? 'default' : 'pointer', padding: '0 4px', lineHeight: 1,
           }}>✕</button>
         </div>
 
@@ -227,7 +254,7 @@ function SellModal({
           <div style={{ textAlign: 'center' }}>
             <div style={{ fontSize: 10, color: 'var(--dim)', marginBottom: 3 }}>AVG COST</div>
             <div style={{ fontSize: 14, fontWeight: 700 }}>
-              ₹{lot.avg_cost.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+              ₹{agg.avg_cost.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
             </div>
           </div>
           <div style={{ textAlign: 'center' }}>
@@ -237,9 +264,9 @@ function SellModal({
             </div>
           </div>
           <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: 10, color: 'var(--dim)', marginBottom: 3 }}>LOT P&L</div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: lot.pnl >= 0 ? 'var(--green)' : 'var(--red)' }}>
-              {lot.pnl >= 0 ? '+' : ''}₹{lot.pnl.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+            <div style={{ fontSize: 10, color: 'var(--dim)', marginBottom: 3 }}>TOTAL P&L</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: agg.pnl >= 0 ? 'var(--green)' : 'var(--red)' }}>
+              {agg.pnl >= 0 ? '+' : ''}₹{agg.pnl.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
             </div>
           </div>
         </div>
@@ -254,7 +281,7 @@ function SellModal({
               onChange={e => setQty(e.target.value)}
               type="number"
               min="1"
-              max={lot.qty}
+              max={agg.qty}
               style={{
                 flex: 1, padding: '9px 12px', fontSize: 14,
                 background: 'var(--bg)',
@@ -263,30 +290,27 @@ function SellModal({
               }}
             />
             <HoverButton
-              onClick={() => setQty(String(lot.qty))}
-              // Highlight when "all" is currently selected so it's obvious the click
-              // actually did something — otherwise the click just silently updates
-              // the qty input, which users routinely miss.
+              onClick={() => setQty(String(agg.qty))}
               style={{
                 padding: '9px 14px', fontSize: 12, fontWeight: 600,
                 whiteSpace: 'nowrap', borderRadius: 8,
-                border: qtyVal === lot.qty ? '1px solid var(--green)' : '1px solid var(--border)',
-                background: qtyVal === lot.qty ? 'rgba(0,200,150,0.18)' : 'var(--faint)',
-                color: qtyVal === lot.qty ? 'var(--green)' : 'var(--muted)',
+                border: qtyVal === agg.qty ? '1px solid var(--green)' : '1px solid var(--border)',
+                background: qtyVal === agg.qty ? 'rgba(0,200,150,0.18)' : 'var(--faint)',
+                color: qtyVal === agg.qty ? 'var(--green)' : 'var(--muted)',
               }}
-              hoverStyle={qtyVal === lot.qty
+              hoverStyle={qtyVal === agg.qty
                 ? { background: 'rgba(0,200,150,0.28)' }
                 : { background: 'var(--border)' }}
               activeStyle={{ filter: 'brightness(0.92)' }}
             >
-              {qtyVal === lot.qty ? `✓ All ${lot.qty}` : `All ${lot.qty}`}
+              {qtyVal === agg.qty ? `✓ All ${agg.qty}` : `All ${agg.qty}`}
             </HoverButton>
           </div>
           {isValid && (
             <input
               type="range"
               min={1}
-              max={lot.qty}
+              max={agg.qty}
               value={qtyVal}
               onChange={e => setQty(e.target.value)}
               style={{ width: '100%', marginTop: 8 }}
@@ -314,7 +338,7 @@ function SellModal({
             {pnl != null && (
               <div style={{ gridColumn: '1/-1' }}>
                 <div style={{ fontSize: 10, color: 'var(--dim)', marginBottom: 3 }}>
-                  REALISED P&L (on {qtyVal} shares)
+                  REALISED P&L (on {qtyVal} shares, FIFO cost basis)
                 </div>
                 <div style={{ fontSize: 15, fontWeight: 700, color: pnl >= 0 ? 'var(--green)' : 'var(--red)' }}>
                   {pnl >= 0 ? '+' : ''}₹{pnl.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
@@ -323,9 +347,44 @@ function SellModal({
             )}
             {isPartial && (
               <div style={{ gridColumn: '1/-1', fontSize: 11, color: 'var(--amber)' }}>
-                Partial: {lot.qty - qtyVal} shares will remain in this lot.
+                Partial: {agg.qty - qtyVal} shares will remain.
               </div>
             )}
+          </div>
+        )}
+
+        {isMultiLot && plan.length > 0 && (
+          <div>
+            <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 6, letterSpacing: '0.05em' }}>
+              FIFO SLICE PLAN
+            </div>
+            <div style={{
+              background: 'var(--bg)', border: '1px solid var(--border)',
+              borderRadius: 8, overflow: 'hidden', fontSize: 12,
+            }}>
+              {plan.map((p, i) => (
+                <div key={p.lot.trade_id ?? i} style={{
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  padding: '7px 12px',
+                  borderTop: i === 0 ? 'none' : '1px solid var(--faint)',
+                }}>
+                  <span style={{ color: 'var(--muted)' }}>
+                    Lot {agg.lots.indexOf(p.lot) + 1}
+                    {p.lot.opened_at && (
+                      <span style={{ color: 'var(--dim)' }}>
+                        {' · '}{new Date(p.lot.opened_at).toLocaleDateString('en-IN', {
+                          day: 'numeric', month: 'short',
+                        })}
+                      </span>
+                    )}
+                    {' · '}₹{p.lot.avg_cost.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                  </span>
+                  <span style={{ color: p.full ? 'var(--red)' : 'var(--amber)', fontWeight: 600 }}>
+                    {p.full ? `Close all ${p.qty}` : `Sell ${p.qty} of ${p.lot.qty}`}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
@@ -362,32 +421,32 @@ function SellModal({
           )}
         </div>
 
-        {exitTrade.isError && (
+        {submitError && (
           <div style={{ fontSize: 12, color: 'var(--red)', background: 'rgba(242,54,69,0.08)', padding: '8px 12px', borderRadius: 8 }}>
-            {String(exitTrade.error)}
+            {submitError}
           </div>
         )}
 
         <div style={{ display: 'flex', gap: 10 }}>
-          <button onClick={onClose} style={{
+          <button onClick={onClose} disabled={submitting} style={{
             flex: 1, padding: '10px 0',
             background: 'transparent', border: '1px solid var(--border)',
-            borderRadius: 10, color: 'var(--muted)', fontSize: 13, cursor: 'pointer',
+            borderRadius: 10, color: 'var(--muted)', fontSize: 13, cursor: submitting ? 'default' : 'pointer',
           }}>Cancel</button>
           <button
             onClick={handleSubmit}
-            disabled={!isValid || exitTrade.isPending || lot.trade_id == null}
+            disabled={!isValid || submitting}
             style={{
               flex: 2, padding: '10px 0',
               background: isValid ? 'var(--red)' : 'var(--faint)',
               border: 'none', borderRadius: 10,
               color: isValid ? '#fff' : 'var(--dim)',
               fontSize: 13, fontWeight: 700,
-              cursor: isValid && !exitTrade.isPending ? 'pointer' : 'default',
-              opacity: exitTrade.isPending ? 0.6 : 1,
+              cursor: isValid && !submitting ? 'pointer' : 'default',
+              opacity: submitting ? 0.6 : 1,
             }}
           >
-            {exitTrade.isPending
+            {submitting
               ? (isPartial ? 'Selling…' : 'Closing…')
               : `${isPartial ? 'Sell' : 'Exit'} ${qtyVal || '—'} shares · ₹${totalValue?.toLocaleString('en-IN', { maximumFractionDigits: 0 }) ?? '—'}`}
           </button>
@@ -397,138 +456,31 @@ function SellModal({
   )
 }
 
-// ── Exit-All confirm dialog ────────────────────────────────────────────────────
-
-function ExitAllModal({
-  agg,
-  onClose,
-}: {
-  agg: AggregatedPosition
-  onClose: () => void
-}) {
-  const exitTrade = useExitTrade()
-  const sellableLots = agg.lots.filter(l => l.trade_id != null)
-  const isPending = exitTrade.isPending
-
-  const handleConfirm = async () => {
-    // Fire sequentially, not Promise.all: each mutation invalidates the
-    // portfolio-snapshot query on success; parallel calls risk racing with
-    // stale trade.qty reads on the backend. Sequential is slower but correct.
-    for (const lot of sellableLots) {
-      const tradeId = lot.trade_id
-      if (tradeId == null) continue
-      await new Promise<void>((resolve, reject) => {
-        exitTrade.mutate(
-          { tradeId, reason: 'Exit all lots' },
-          { onSuccess: () => resolve(), onError: err => reject(err) },
-        )
-      })
-    }
-    onClose()
-  }
-
-  const handleBackdrop = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (e.target === e.currentTarget && !isPending) onClose()
-  }
-
-  return (
-    <div
-      onClick={handleBackdrop}
-      style={{
-        position: 'fixed', inset: 0, zIndex: 200,
-        background: 'rgba(0,0,0,0.65)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        backdropFilter: 'blur(2px)',
-      }}
-    >
-      <div style={{
-        background: 'var(--surface)', border: '1px solid var(--border)',
-        borderRadius: 16, padding: 28, width: 420, maxWidth: '92vw',
-        display: 'flex', flexDirection: 'column', gap: 18,
-        boxShadow: '0 24px 64px rgba(0,0,0,0.6)',
-      }}>
-        <div>
-          <div style={{ fontWeight: 800, fontSize: 18 }}>Exit all {agg.symbol}?</div>
-          <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>
-            Closes {sellableLots.length} lot{sellableLots.length !== 1 ? 's' : ''}
-            {' · '}{agg.qty} shares total{' · '}
-            <span style={{ color: agg.pnl >= 0 ? 'var(--green)' : 'var(--red)', fontWeight: 700 }}>
-              {agg.pnl >= 0 ? '+' : ''}₹{agg.pnl.toLocaleString('en-IN')} realised
-            </span>
-          </div>
-        </div>
-
-        <div style={{
-          fontSize: 12, color: 'var(--amber)',
-          background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.35)',
-          borderRadius: 8, padding: '10px 12px',
-        }}>
-          Each lot has its own entry price and tax bucket — closing them together
-          realises capital gains across all of them at once. Prefer per-lot exit
-          if you're managing tax lots.
-        </div>
-
-        {exitTrade.isError && (
-          <div style={{ fontSize: 12, color: 'var(--red)', background: 'rgba(242,54,69,0.08)', padding: '8px 12px', borderRadius: 8 }}>
-            One or more lots failed to close: {String(exitTrade.error)}
-          </div>
-        )}
-
-        <div style={{ display: 'flex', gap: 10 }}>
-          <button onClick={onClose} disabled={isPending} style={{
-            flex: 1, padding: '10px 0',
-            background: 'transparent', border: '1px solid var(--border)',
-            borderRadius: 10, color: 'var(--muted)', fontSize: 13, cursor: isPending ? 'default' : 'pointer',
-          }}>Cancel</button>
-          <button
-            onClick={handleConfirm}
-            disabled={isPending || sellableLots.length === 0}
-            style={{
-              flex: 2, padding: '10px 0',
-              background: 'var(--red)', border: 'none', borderRadius: 10,
-              color: '#fff', fontSize: 13, fontWeight: 700,
-              cursor: isPending ? 'default' : 'pointer',
-              opacity: isPending ? 0.6 : 1,
-            }}
-          >
-            {isPending ? 'Closing all…' : `Exit all ${agg.qty} shares`}
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ── Aggregated row (with expandable chart + per-lot detail) ────────────────────
+// ── Aggregated row (with bottom chevron + expandable detail) ──────────────────
 
 function AggregatedRow({
   agg,
   days,
   indicators,
-  onSellLot,
-  onExitAll,
+  onSell,
+  colSpan,
 }: {
   agg: AggregatedPosition
   days: number
   indicators: ChartIndicators
-  onSellLot: (lot: PositionSnapshot) => void
-  onExitAll: () => void
+  onSell: () => void
+  colSpan: number
 }) {
-  // Use the first lot's trade for signal-based chart markers (Entry/SL/T1/T2).
-  // Different lots for the same symbol may have different signal_ids, but the
-  // aggregated view can only show one set of markers — first lot is a reasonable
-  // default; per-lot lines would be visually noisy.
   const firstTradeId = agg.lots[0].trade_id ?? undefined
   const { expanded, setExpanded, chart } = useChartPanel(agg.symbol, firstTradeId, days)
   const pnlColor = agg.pnl >= 0 ? 'var(--green)' : 'var(--red)'
   const isMultiLot = agg.lots.length > 1
-  const sellableLots = agg.lots.filter(l => l.trade_id != null)
-  const canExit = sellableLots.length > 0
+  const canSell = agg.lots.some(l => l.trade_id != null)
 
   return (
     <>
-      <tr style={{ borderBottom: expanded ? 'none' : '1px solid var(--faint)' }}>
-        <td style={{ padding: '12px 16px', fontWeight: 700 }}>
+      <tr>
+        <td style={{ padding: '12px 16px', fontWeight: 700, whiteSpace: 'nowrap' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             {agg.symbol}
             {isMultiLot && (
@@ -541,82 +493,94 @@ function AggregatedRow({
             )}
           </div>
         </td>
-        <td style={{ padding: '12px 16px' }}>
+        <td style={{ padding: '12px 16px', whiteSpace: 'nowrap' }}>
           <span style={{
             fontSize: 11, padding: '2px 6px', borderRadius: 4,
             background: 'var(--faint)', color: 'var(--muted)', textTransform: 'uppercase',
           }}>{agg.mode}</span>
         </td>
-        <td style={{ padding: '12px 16px', color: 'var(--muted)' }}>{agg.qty}</td>
-        <td style={{ padding: '12px 16px' }}>
+        <td style={{ padding: '12px 16px', color: 'var(--muted)', whiteSpace: 'nowrap' }}>{agg.qty}</td>
+        <td style={{ padding: '12px 16px', whiteSpace: 'nowrap' }}>
           ₹{agg.avg_cost.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
         </td>
-        <td style={{ padding: '12px 16px', fontWeight: 600 }}>
+        <td style={{ padding: '12px 16px', fontWeight: 600, whiteSpace: 'nowrap' }}>
           ₹{agg.current_price.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
         </td>
-        <td style={{ padding: '12px 16px', color: 'var(--red)' }}>
+        <td style={{ padding: '12px 16px', color: 'var(--red)', whiteSpace: 'nowrap' }}>
           {agg.stop_loss != null
             ? `₹${agg.stop_loss.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`
             : '—'}
           {isMultiLot && agg.stop_loss != null && (
-            <span title="Tightest SL across lots — expand to see all"
+            <span title="Tightest SL across lots"
                   style={{ fontSize: 10, color: 'var(--dim)', marginLeft: 4 }}>
               (tightest)
             </span>
           )}
         </td>
-        <td style={{ padding: '12px 16px', color: 'var(--muted)', fontSize: 12 }}>
+        <td style={{ padding: '12px 16px', color: 'var(--muted)', fontSize: 12, whiteSpace: 'nowrap' }}>
           {agg.sl_distance_pct != null ? `${agg.sl_distance_pct.toFixed(1)}%` : '—'}
         </td>
-        <td style={{ padding: '12px 16px', color: pnlColor, fontWeight: 600 }}>
+        <td style={{ padding: '12px 16px', color: pnlColor, fontWeight: 600, whiteSpace: 'nowrap' }}>
           {agg.pnl >= 0 ? '+' : ''}₹{agg.pnl.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
         </td>
-        <td style={{ padding: '12px 16px', color: pnlColor, fontSize: 12 }}>
+        <td style={{ padding: '12px 16px', color: pnlColor, fontSize: 12, whiteSpace: 'nowrap' }}>
           {agg.pnl_pct >= 0 ? '+' : ''}{agg.pnl_pct.toFixed(1)}%
         </td>
-        <td style={{ padding: '12px 16px' }}>
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-            {canExit ? (
-              isMultiLot ? (
-                <HoverButton
-                  onClick={onExitAll}
-                  title="Close every lot for this symbol"
-                  style={{ ...SELL_BUTTON_BASE, padding: '5px 10px' }}
-                  hoverStyle={SELL_BUTTON_HOVER}
-                  activeStyle={SELL_BUTTON_ACTIVE}
-                >Exit all</HoverButton>
-              ) : (
-                <HoverButton
-                  onClick={() => onSellLot(agg.lots[0])}
-                  style={SELL_BUTTON_BASE}
-                  hoverStyle={SELL_BUTTON_HOVER}
-                  activeStyle={SELL_BUTTON_ACTIVE}
-                >Sell</HoverButton>
-              )
-            ) : (
-              <span style={{ fontSize: 11, color: 'var(--dim)' }}>—</span>
-            )}
-            <ChartToggleButton
-              expanded={expanded}
-              onToggle={() => setExpanded(e => !e)}
-              label={isMultiLot ? 'Lots' : 'History'}
-            />
-          </div>
+        <td style={{ padding: '12px 16px', whiteSpace: 'nowrap' }}>
+          {canSell ? (
+            <HoverButton
+              onClick={onSell}
+              title={isMultiLot ? `Sell across ${agg.lots.length} lots (FIFO)` : 'Sell shares'}
+              style={SELL_BUTTON_BASE}
+              hoverStyle={SELL_BUTTON_HOVER}
+              activeStyle={SELL_BUTTON_ACTIVE}
+            >Sell</HoverButton>
+          ) : (
+            <span style={{ fontSize: 11, color: 'var(--dim)' }}>—</span>
+          )}
+        </td>
+      </tr>
+      {/* Bottom chevron row — full-width click target, subtle by default so it
+       * doesn't compete with the Sell button but is easy to find on any row. */}
+      <tr style={{ borderBottom: '1px solid var(--faint)' }}>
+        <td colSpan={colSpan} style={{ padding: 0 }}>
+          <button
+            onClick={() => setExpanded(e => !e)}
+            style={{
+              width: '100%', padding: '6px 0',
+              background: expanded ? 'var(--faint)' : 'transparent',
+              border: 'none',
+              color: 'var(--muted)', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              lineHeight: 0,
+            }}
+            title={expanded ? 'Hide details' : `Show ${isMultiLot ? `${agg.lots.length} lots` : 'purchase history'} + chart`}
+            aria-label={expanded ? 'Hide details' : 'Show details'}
+          >
+            <svg
+              width="10" height="6" viewBox="0 0 20 12"
+              fill="none" stroke="currentColor"
+              strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"
+              style={{ transform: expanded ? 'rotate(180deg)' : 'none', transition: 'transform 150ms ease' }}
+            >
+              <polyline points="2 3 10 10 18 3" />
+            </svg>
+          </button>
         </td>
       </tr>
       {expanded && (
         <tr style={{ borderBottom: '1px solid var(--faint)' }}>
-          <td colSpan={10} style={{ padding: 0 }}>
+          <td colSpan={colSpan} style={{ padding: 0 }}>
             <div style={{ borderTop: '1px solid var(--border)' }}>
-              {agg.lots.length > 0 && (
-                <div style={{ padding: '12px 16px', background: 'var(--bg)' }}>
-                  <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 8, letterSpacing: '0.05em' }}>
-                    {isMultiLot ? `LOTS (${agg.lots.length})` : 'PURCHASE HISTORY'}
-                  </div>
-                  <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
+              <div style={{ padding: '12px 16px', background: 'var(--bg)' }}>
+                <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 8, letterSpacing: '0.05em' }}>
+                  {isMultiLot ? `LOTS (${agg.lots.length})` : 'PURCHASE HISTORY'}
+                </div>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse', minWidth: 560 }}>
                     <thead>
                       <tr style={{ color: 'var(--dim)', fontSize: 10 }}>
-                        {['Opened', 'Qty', 'Avg Cost', 'SL', 'Lot P&L', 'Lot P&L %', ''].map(h => (
+                        {['#', 'Opened', 'Qty', 'Avg Cost', 'SL', 'Lot P&L', 'Lot P&L %'].map(h => (
                           <th key={h} style={{ padding: '6px 10px', textAlign: 'left', fontWeight: 500 }}>
                             {h}
                           </th>
@@ -628,7 +592,8 @@ function AggregatedRow({
                         const lotPnlColor = lot.pnl >= 0 ? 'var(--green)' : 'var(--red)'
                         return (
                           <tr key={lot.trade_id ?? i} style={{ borderTop: '1px solid var(--faint)' }}>
-                            <td style={{ padding: '8px 10px', color: 'var(--muted)' }}>
+                            <td style={{ padding: '8px 10px', color: 'var(--dim)' }}>{i + 1}</td>
+                            <td style={{ padding: '8px 10px', color: 'var(--muted)', whiteSpace: 'nowrap' }}>
                               {lot.opened_at != null
                                 ? new Date(lot.opened_at).toLocaleDateString('en-IN', {
                                     day: 'numeric', month: 'short', year: 'numeric',
@@ -636,31 +601,19 @@ function AggregatedRow({
                                 : '—'}
                             </td>
                             <td style={{ padding: '8px 10px' }}>{lot.qty}</td>
-                            <td style={{ padding: '8px 10px' }}>
+                            <td style={{ padding: '8px 10px', whiteSpace: 'nowrap' }}>
                               ₹{lot.avg_cost.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
                             </td>
-                            <td style={{ padding: '8px 10px', color: 'var(--red)' }}>
+                            <td style={{ padding: '8px 10px', color: 'var(--red)', whiteSpace: 'nowrap' }}>
                               {lot.stop_loss != null
                                 ? `₹${lot.stop_loss.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`
                                 : '—'}
                             </td>
-                            <td style={{ padding: '8px 10px', color: lotPnlColor, fontWeight: 600 }}>
+                            <td style={{ padding: '8px 10px', color: lotPnlColor, fontWeight: 600, whiteSpace: 'nowrap' }}>
                               {lot.pnl >= 0 ? '+' : ''}₹{lot.pnl.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
                             </td>
                             <td style={{ padding: '8px 10px', color: lotPnlColor }}>
                               {lot.pnl_pct >= 0 ? '+' : ''}{lot.pnl_pct.toFixed(1)}%
-                            </td>
-                            <td style={{ padding: '8px 10px' }}>
-                              {lot.trade_id != null ? (
-                                <HoverButton
-                                  onClick={() => onSellLot(lot)}
-                                  style={{ ...SELL_BUTTON_BASE, padding: '3px 10px' }}
-                                  hoverStyle={SELL_BUTTON_HOVER}
-                                  activeStyle={SELL_BUTTON_ACTIVE}
-                                >Sell</HoverButton>
-                              ) : (
-                                <span style={{ fontSize: 11, color: 'var(--dim)' }}>—</span>
-                              )}
                             </td>
                           </tr>
                         )
@@ -668,7 +621,7 @@ function AggregatedRow({
                     </tbody>
                   </table>
                 </div>
-              )}
+              </div>
               <ChartPanelBody chart={chart} indicators={indicators} height={320} />
             </div>
           </td>
@@ -682,14 +635,13 @@ function AggregatedRow({
 
 export default function Positions() {
   const snap   = usePortfolioSnapshot()
-  const trades = useSwingPositions()   // still used indirectly via trade_id on lots
+  const trades = useSwingPositions()
   const error  = snap.error || trades.error
 
   const daily = useDailyHoldingsSummary()
   const refreshDaily = useRefreshAiSummary('daily')
 
-  const [sellLot, setSellLot] = useState<PositionSnapshot | null>(null)
-  const [exitAllTarget, setExitAllTarget] = useState<AggregatedPosition | null>(null)
+  const [sellTarget, setSellTarget] = useState<AggregatedPosition | null>(null)
   const [days, setDays] = useState(90)
   const [indicators, setIndicators] = useState<ChartIndicators>(DEFAULT_CHART_INDICATORS)
   const toggleInd = (k: keyof ChartIndicators) =>
@@ -699,6 +651,8 @@ export default function Positions() {
   const aggregated = useMemo(() => aggregate(positions), [positions])
 
   if (error) return <ErrorBanner message={String(error)} />
+
+  const HEADERS = ['Symbol', 'Mode', 'Qty', 'Avg Cost', 'CMP', 'Stop Loss', 'SL Dist', 'P&L', 'P&L %', '']
 
   return (
     <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
@@ -743,12 +697,17 @@ export default function Positions() {
           {[...Array(3)].map((_, i) => <Skeleton key={i} h={60} />)}
         </div>
       ) : (
-        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
-          <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
+        // overflow-x: auto lets narrow viewports scroll the wide table instead
+        // of clipping columns off the right edge.
+        <div style={{
+          background: 'var(--surface)', border: '1px solid var(--border)',
+          borderRadius: 12, overflowX: 'auto',
+        }}>
+          <table style={{ width: '100%', minWidth: 900, fontSize: 13, borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ color: 'var(--muted)', fontSize: 11, borderBottom: '1px solid var(--border)' }}>
-                {['Symbol', 'Mode', 'Qty', 'Avg Cost', 'CMP', 'Stop Loss', 'SL Dist', 'P&L', 'P&L %', ''].map(h => (
-                  <th key={h} style={{ padding: '10px 16px', textAlign: 'left', fontWeight: 500 }}>{h}</th>
+                {HEADERS.map(h => (
+                  <th key={h} style={{ padding: '10px 16px', textAlign: 'left', fontWeight: 500, whiteSpace: 'nowrap' }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -759,13 +718,13 @@ export default function Positions() {
                   agg={agg}
                   days={days}
                   indicators={indicators}
-                  onSellLot={setSellLot}
-                  onExitAll={() => setExitAllTarget(agg)}
+                  onSell={() => setSellTarget(agg)}
+                  colSpan={HEADERS.length}
                 />
               ))}
               {!aggregated.length && (
                 <tr>
-                  <td colSpan={10} style={{ padding: '32px 16px', textAlign: 'center', fontSize: 13, color: 'var(--dim)' }}>
+                  <td colSpan={HEADERS.length} style={{ padding: '32px 16px', textAlign: 'center', fontSize: 13, color: 'var(--dim)' }}>
                     No open positions
                   </td>
                 </tr>
@@ -777,7 +736,6 @@ export default function Positions() {
 
       </div>
 
-      {/* Sticky holdings AI rail — pinned while the table scrolls */}
       <aside style={{
         width: 340,
         flexShrink: 0,
@@ -798,16 +756,10 @@ export default function Positions() {
         />
       </aside>
 
-      {sellLot && (
+      {sellTarget && (
         <SellModal
-          lot={sellLot}
-          onClose={() => setSellLot(null)}
-        />
-      )}
-      {exitAllTarget && (
-        <ExitAllModal
-          agg={exitAllTarget}
-          onClose={() => setExitAllTarget(null)}
+          agg={sellTarget}
+          onClose={() => setSellTarget(null)}
         />
       )}
     </div>
