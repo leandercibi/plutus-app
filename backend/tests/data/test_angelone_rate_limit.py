@@ -68,10 +68,16 @@ def test_calls_far_apart_do_not_add_artificial_delay(monkeypatch):
     instead of a real time.sleep(): a real wall-clock measurement here was
     intermittently flaky under system load (OS scheduling jitter routinely
     blew past the tight assertion threshold when the full suite was running)."""
+    # Reset _LAST_CALL — prior tests in the same worker may have left it set
+    # in the recent past, which would cause our first _rate_wait() below to
+    # sleep and contaminate the sleep_calls list before we even get to the
+    # second call we actually want to assert on.
+    _mod._LAST_CALL[0] = 0.0
+
     sleep_calls: list[float] = []
     monkeypatch.setattr(_mod.time, "sleep", lambda s: sleep_calls.append(s))
 
-    _rate_wait()  # first call — sets _LAST_CALL
+    _rate_wait()  # first call — sets _LAST_CALL from a known-clean 0.0
     _mod._LAST_CALL[0] -= _MIN_INTERVAL + 0.05  # simulate time already elapsed
 
     _rate_wait()  # second call — should see it's already past the interval
