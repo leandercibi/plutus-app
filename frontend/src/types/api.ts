@@ -36,6 +36,12 @@ export interface PortfolioSnapshot {
   total_current: number
   total_pnl: number
   total_pnl_pct: number
+  // Live realised P/L across closed swing trades — sourced from actual fills
+  // on every request. Replaces the old weekly-postmortem read that only
+  // refreshed on Sundays.
+  total_realized_pnl: number
+  total_realized_pct: number
+  n_closed_trades: number
   checked_at: string
 }
 
