@@ -71,12 +71,14 @@ def test_calls_far_apart_do_not_add_artificial_delay(monkeypatch):
     sleep_calls: list[float] = []
     monkeypatch.setattr(_mod.time, "sleep", lambda s: sleep_calls.append(s))
 
-    _rate_wait()  # first call — sets _LAST_CALL
+    _rate_wait()  # first call — sets _LAST_CALL. Depending on prior module
+    # state it may or may not sleep; that's not what this test cares about.
     _mod._LAST_CALL[0] -= _MIN_INTERVAL + 0.05  # simulate time already elapsed
+    sleep_calls.clear()  # start clean — only the second call's behavior matters
 
     _rate_wait()  # second call — should see it's already past the interval
 
-    assert sleep_calls == [], f"Unexpected artificial delay: slept for {sleep_calls}"
+    assert sleep_calls == [], f"Unexpected artificial delay on 2nd call: slept for {sleep_calls}"
 
 
 # ---------------------------------------------------------------------------
