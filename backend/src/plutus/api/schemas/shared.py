@@ -123,6 +123,12 @@ class PortfolioSnapshotOut(BaseModel):
     total_current: float
     total_pnl: float
     total_pnl_pct: float
+    # Realised P/L across all closed swing trades — derived from BUY/SELL fill
+    # rows on every request so it reflects the latest manual exit immediately
+    # (the WeeklyPostmortem row it used to read from only refreshes once a week).
+    total_realized_pnl: float = 0.0
+    total_realized_pct: float = 0.0
+    n_closed_trades: int = 0
     checked_at: datetime
 
 

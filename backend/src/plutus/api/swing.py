@@ -217,11 +217,15 @@ def enter_from_signal(
 def manual_exit(trade_id: int, body: ManualExitIn, db: Session = Depends(get_db)) -> SwingTradeOut:
     """Close a swing trade — fully by default, partially if ``body.qty`` < remaining.
 
-    Partial exit path: logs a SELL Fill for the specified qty (at ``body.price``
-    or the latest cached LatestPrice for the symbol), decrements ``trade.qty``,
-    and keeps the trade OPEN / T1_HIT. Full exit path (qty omitted or >=
-    remaining) closes the trade and sets state to CLOSED_WIN/CLOSED_LOSS as
-    before. No alert is re-fired here — alerting is the monitor's job.
+    Every SELL (partial or full) writes a closing Fill row AND credits
+    proportional realised R onto ``trade.realized_R``:
+
+        r_slice = ((sell_price − avg_entry) / risk_per_share) × (qty_sold / original_qty)
+
+    ``original_qty`` is the sum of BUY fills so the ratio stays stable across
+    successive partials. Full exit additionally closes the trade and sets state
+    from the accumulated realised R (>= 0 → CLOSED_WIN, else CLOSED_LOSS).
+    Alerting is the monitor's job — nothing re-fires here.
     """
     from decimal import Decimal
 
@@ -231,52 +235,79 @@ def manual_exit(trade_id: int, body: ManualExitIn, db: Session = Depends(get_db)
     if trade is None:
         raise HTTPException(status_code=404, detail="trade not found")
 
-    is_partial = body.qty is not None and body.qty < trade.qty
     if body.qty is not None and body.qty <= 0:
         raise HTTPException(status_code=400, detail="qty must be positive")
+    is_partial = body.qty is not None and body.qty < trade.qty
+    sell_qty = cast(int, body.qty) if is_partial else trade.qty
+
+    # Avg entry + original qty from BUY fills — the sizing snapshot against
+    # which realised R is normalised. Falls back to signal.entry when the trade
+    # has no fill rows (legacy pre-fill data) so we credit 0R without crashing.
+    buys = list(
+        db.execute(select(Fill).where(Fill.trade_id == trade.id, Fill.side == "BUY")).scalars()
+    )
+    signal = db.get(SwingSignal, trade.signal_id)
+    original_qty = sum(f.qty for f in buys) if buys else trade.qty
+    if buys and original_qty > 0:
+        avg_entry = sum(float(f.price) * f.qty for f in buys) / original_qty
+    else:
+        avg_entry = float(signal.entry) if signal is not None else 0.0
+
+    # Resolve sell price: caller's → latest cached LatestPrice → avg_entry as
+    # last-resort so a full exit still closes cleanly (as a 0R scratch) rather
+    # than 422ing when the price refresh job is stale. Partial exits require a
+    # real price — silently scratching a partial would be misleading.
+    if body.price is not None:
+        sell_price = body.price
+    else:
+        latest = (
+            db.execute(select(LatestPrice).where(LatestPrice.symbol == trade.symbol))
+            .scalars()
+            .first()
+        )
+        if latest is not None:
+            sell_price = Decimal(str(latest.price))
+        elif is_partial:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    f"No cached price for {trade.symbol}; pass an explicit "
+                    f"`price` in the request body for partial exits."
+                ),
+            )
+        else:
+            sell_price = Decimal(str(avg_entry))
+
+    # risk_R on SwingTrade is ₹/share (entry − stop_loss). R-multiple for this
+    # slice, then scaled by slice/original so full-position closes sum to 1× the
+    # size-independent R and partials credit proportionally.
+    r_slice = 0.0
+    if trade.risk_R and trade.risk_R > 0 and original_qty > 0:
+        r_multiple = (float(sell_price) - avg_entry) / trade.risk_R
+        r_slice = r_multiple * (sell_qty / original_qty)
+
+    db.add(
+        Fill(
+            trade_id=trade.id,
+            kind="REAL",
+            side="SELL",
+            qty=sell_qty,
+            price=sell_price,
+            cost_inr=Decimal("0"),
+            filled_at=datetime.utcnow(),
+        )
+    )
+    trade.realized_R = (trade.realized_R or 0.0) + r_slice
 
     if is_partial:
-        sell_qty = cast(int, body.qty)
-        # Fill needs a concrete price — use the caller's if given, else the latest cached
-        # LatestPrice for this symbol. Fail loud rather than silently defaulting to 0.
-        if body.price is not None:
-            sell_price = body.price
-        else:
-            latest = (
-                db.execute(select(LatestPrice).where(LatestPrice.symbol == trade.symbol))
-                .scalars()
-                .first()
-            )
-            if latest is None:
-                raise HTTPException(
-                    status_code=422,
-                    detail=(
-                        f"No cached price for {trade.symbol}; pass an explicit "
-                        f"`price` in the request body for partial exits."
-                    ),
-                )
-            sell_price = Decimal(str(latest.price))
-
-        db.add(
-            Fill(
-                trade_id=trade.id,
-                kind="REAL",
-                side="SELL",
-                qty=sell_qty,
-                price=sell_price,
-                cost_inr=Decimal("0"),
-                filled_at=datetime.utcnow(),
-            )
-        )
         trade.qty -= sell_qty
         db.flush()
         return SwingTradeOut.model_validate(trade, from_attributes=True)
 
-    # Full exit (qty omitted or covers the whole remaining position).
-    realized = trade.realized_R if trade.realized_R is not None else 0.0
-    trade.state = "CLOSED_WIN" if realized >= 0 else "CLOSED_LOSS"
+    # Full exit: close and set state from accumulated realised R.
+    trade.qty = 0
+    trade.state = "CLOSED_WIN" if (trade.realized_R or 0.0) >= 0 else "CLOSED_LOSS"
     trade.closed_at = datetime.utcnow()
-    trade.realized_R = realized
     trade.exit_reason = body.reason
     db.flush()
     return SwingTradeOut.model_validate(trade, from_attributes=True)

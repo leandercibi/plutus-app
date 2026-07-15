@@ -82,35 +82,45 @@ export default function Dashboard() {
 
       {/* Portfolio stat cards */}
       {p ? (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12 }}>
           <StatCard label="Invested" value={fmt(p.total_invested)} />
           <StatCard label="Current Value" value={fmt(p.total_current)}
             trend={p.total_current >= p.total_invested ? 'up' : 'down'} />
           <StatCard label="Unrealised P&L" value={fmt(p.total_pnl)}
             sub={`${p.total_pnl_pct >= 0 ? '+' : ''}${p.total_pnl_pct.toFixed(2)}%`}
             trend={p.total_pnl >= 0 ? 'up' : 'down'} />
+          <StatCard label="Realised P&L" value={fmt(p.total_realized_pnl)}
+            sub={
+              p.n_closed_trades > 0
+                ? `${p.total_realized_pct >= 0 ? '+' : ''}${p.total_realized_pct.toFixed(2)}% · ${p.n_closed_trades} closed`
+                : 'no closed trades'
+            }
+            trend={p.total_realized_pnl >= 0 ? 'up' : 'down'} />
           <StatCard label="Open Positions" value={String(p.positions.length)} trend="neutral" />
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
-          {[...Array(4)].map((_, i) => <Skeleton key={i} h={80} />)}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12 }}>
+          {[...Array(5)].map((_, i) => <Skeleton key={i} h={80} />)}
         </div>
       )}
 
-      {/* Returns: realised (closed) + unrealised (open) vs Nifty 50 */}
-      {postmortem.data && (() => {
+      {/* Returns: realised (closed) + unrealised (open) vs Nifty 50.
+       * Realised value comes from the live portfolio snapshot (updated on
+       * every sell); postmortem is only used for the Nifty benchmark comp. */}
+      {postmortem.data && p && (() => {
         const pm = postmortem.data
-        const unreal = p?.total_pnl_pct
-        const delta = pm.swing_return_pct - pm.nifty_return_pct
+        const real = p.total_realized_pct
+        const unreal = p.total_pnl_pct
+        const delta = real - pm.nifty_return_pct
         const beat = delta >= 0
         const green = 'var(--green)', red = 'var(--red)', muted = 'var(--muted)'
         const maxAbs = Math.max(
-          Math.abs(pm.swing_return_pct), Math.abs(unreal ?? 0), Math.abs(pm.nifty_return_pct), 0.01,
+          Math.abs(real), Math.abs(unreal), Math.abs(pm.nifty_return_pct), 0.01,
         )
         const barW = (v: number) => `${Math.max(2, (Math.abs(v) / maxAbs) * 100)}%`
         const rows: { label: string; hint: string; value: number | undefined; color: string }[] = [
-          { label: 'Realised', hint: 'closed', value: pm.swing_return_pct, color: pm.swing_return_pct >= 0 ? green : red },
-          { label: 'Unrealised', hint: 'open', value: unreal, color: unreal == null ? muted : unreal >= 0 ? green : red },
+          { label: 'Realised', hint: 'closed', value: real, color: real >= 0 ? green : red },
+          { label: 'Unrealised', hint: 'open', value: unreal, color: unreal >= 0 ? green : red },
           { label: 'Nifty 50', hint: '', value: pm.nifty_return_pct, color: muted },
         ]
         return (
@@ -119,7 +129,7 @@ export default function Dashboard() {
               <div>
                 <span style={{ fontSize: 13, fontWeight: 600 }}>Returns vs Nifty 50</span>
                 <span style={{ fontSize: 11, color: 'var(--muted)', marginLeft: 8 }}>
-                  Realised: wk ending {new Date(pm.week_ending).toLocaleDateString('en-IN')} · {pm.n_swing_trades_closed} trades
+                  Realised: {p.n_closed_trades} closed trade{p.n_closed_trades === 1 ? '' : 's'} (live) · Nifty wk ending {new Date(pm.week_ending).toLocaleDateString('en-IN')}
                 </span>
               </div>
               <span style={{

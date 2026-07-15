@@ -829,6 +829,34 @@ def compute_portfolio_snapshot(db: Session, settings: Settings) -> PortfolioSnap
             )
         )
 
+    # Live realised P/L across closed swing trades. Sums real fills (BUY cost
+    # basis vs SELL proceeds) per closed trade so a manual exit shows up here
+    # on the next snapshot request — no dependency on the weekly postmortem
+    # job. Denominator for the % is the realised trades' entry cost basis.
+    closed_trades = (
+        db.execute(select(SwingTrade).where(SwingTrade.state.in_(["CLOSED_WIN", "CLOSED_LOSS"])))
+        .scalars()
+        .all()
+    )
+    realized_pnl = 0.0
+    realized_cost_basis = 0.0
+    n_closed = len(closed_trades)
+    if closed_trades:
+        fills_by_trade: dict[int, list[Fill]] = {}
+        for f in db.execute(
+            select(Fill).where(Fill.trade_id.in_([t.id for t in closed_trades]))
+        ).scalars():
+            fills_by_trade.setdefault(f.trade_id, []).append(f)
+        for trade in closed_trades:
+            trade_fills = fills_by_trade.get(trade.id, [])
+            buy_value = sum(float(f.price) * f.qty for f in trade_fills if f.side == "BUY")
+            sell_value = sum(float(f.price) * f.qty for f in trade_fills if f.side == "SELL")
+            # A closed trade with no SELL fill (legacy pre-fix data) contributes
+            # nothing rather than a phantom -100% loss.
+            if any(f.side == "SELL" for f in trade_fills):
+                realized_pnl += sell_value - buy_value
+                realized_cost_basis += buy_value
+
     pnl = total_current - total_invested
     return PortfolioSnapshotOut(
         positions=positions,
@@ -836,6 +864,11 @@ def compute_portfolio_snapshot(db: Session, settings: Settings) -> PortfolioSnap
         total_current=round(total_current, 2),
         total_pnl=round(pnl, 2),
         total_pnl_pct=round((pnl / total_invested) * 100, 2) if total_invested else 0.0,
+        total_realized_pnl=round(realized_pnl, 2),
+        total_realized_pct=(
+            round((realized_pnl / realized_cost_basis) * 100, 2) if realized_cost_basis else 0.0
+        ),
+        n_closed_trades=n_closed,
         checked_at=datetime.utcnow(),
     )
 
